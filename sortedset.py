@@ -34,7 +34,7 @@ class sortedset(list):
     def remove(self, value):
         i = bisect_left(self, value)
         if i<len(self) and self[i] == value: del self[i]
-        raise ValueError('%s not in sortedset' % value)
+        else: raise ValueError('%s not in sortedset' % value)
     def discard(self, value):
         i = bisect_left(self, value)
         if i<len(self) and self[i] == value: del self[i]
