@@ -21,13 +21,11 @@ def singleton(cls):
     return getinstance
 
 class Singleton(type):
-    def __init__(cls, *args, **kwargs):
-        super(Singleton, cls).__init__(*args, **kwargs)
-        cls.__instance = None
+    __instance = None
     def __call__(cls, *args, **kwargs):
-        if cls.__instance is None:
-            cls.__instance = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls.__instance
+        if Singleton.__instance is None:
+            Singleton.__instance = super(Singleton, cls).__call__(*args, **kwargs)
+        return Singleton.__instance
 
 class MyClass(object):
     def __init__(self):
