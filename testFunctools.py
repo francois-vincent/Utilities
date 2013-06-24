@@ -20,8 +20,9 @@ callback('hello')
 def debug(func):
     @wraps(func)
     def wrapped(*args,**kwargs):
-        print("Calling '%s' with args %s" % (func.__name__, args))
-        return func(*args,**kwargs)
+        res = func(*args,**kwargs)
+        print("%s%s = %s" % (func.__name__, args, res))
+        return res
     return wrapped
 
 @debug
