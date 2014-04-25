@@ -11,10 +11,10 @@ if sys.version_info[0] == 3:
 def make_authorize(message='proceed ? ', grant='yes', granted=False):
     outer = locals()
     def process():
-        if outer['done']:
+        if outer['granted']:
             return True
         if raw_input(message) == grant:
-            outer['done'] = True
+            outer['granted'] = True
             return True
     return process
 
