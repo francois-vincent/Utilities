@@ -11,13 +11,12 @@ __mail__ = 'fvincent@groupeseb.com'
 __github__ = 'https://github.com/francois-vincent'
 
 def singleton(cls):
-    # the instance trick as list is ugly the fault is on python2.
-    # with python3 I can use nonlocal variable
-    instance =  []
+    instance = None
+    outer = locals()
     def getinstance(*args, **kwargs):
-        if not instance:
-            instance.append(cls(*args, **kwargs))
-        return instance[0]
+        if not outer['instance']:
+            outer['instance'] = cls(*args, **kwargs)
+        return outer['instance']
     return getinstance
 
 class Singleton(type):
