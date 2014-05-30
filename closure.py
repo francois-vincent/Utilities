@@ -21,7 +21,5 @@ def make_authorize(message='proceed ? ', grant='yes', granted=False):
 authorize = make_authorize()
 
 if __name__ == '__main__':
-    if authorize():
-        print('authorize !')
-    if authorize():
-        print('authorize !')
+    for i in xrange(5):
+        print(" %sauthorize !" % ('' if authorize() else 'do not ',))
