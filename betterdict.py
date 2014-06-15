@@ -19,7 +19,7 @@ class bdict(dict):
         return self.update(bdict().update(E, **F).__sub__(self))
 
     def remove(self, *keys):
-        if len(keys) == 1 and isinstance(keys, (tuple, list)):
+        if len(keys) == 1 and hasattr(keys[0], '__iter__'):
             keys = keys[0]
         for k in keys:
             try:
