@@ -42,30 +42,38 @@ class Config(dict):
         try:
             return int(self.get(k, d))
         except TypeError:
-            raise ValueError('Not a leaf or not an integer: %s' % k)
+            if d == 'raise':
+                raise ValueError('Not a leaf or not an integer: %s' % k)
+            return d
 
     def get_float(self, k, d=0.0):
         try:
             return float(self.get(k, d))
         except TypeError:
-            raise ValueError('Not a leaf or not a float: %s' % k)
+            if d == 'raise':
+                raise ValueError('Not a leaf or not a float: %s' % k)
+            return d
 
     def get_boolean(self, k, d=False):
         v = self.get(k, d)
+        if isinstance(v, bool):
+            return v
         try:
-            return bool(v)
-        except TypeError:
-            try:
-                return self._boolean_states[v.lower()]
-            except (KeyError, AttributeError):
-                raise ValueError('Not a leaf or not a boolean %s' % k)
+            return self._boolean_states[v.lower()]
+        except (KeyError, AttributeError):
+            if d == 'raise':
+                raise ValueError('Not a leaf or not a boolean: %s' % k)
+            return d
     get_bool = get_boolean
 
     def get_json(self, k, d='[]'):
         """ use only to get a list from an ini config file
             use syntax: ["a","b"] (double quotes mandatory)
         """
-        return json.loads(self.get(k, d))
+        try:
+            return json.loads(self.get(k, d))
+        except ValueError:
+            return json.loads(d)
 
 
 def yaml_parser(file):
@@ -103,14 +111,15 @@ class CachedConfigReader(object):
       use specified or parser specific to file extension,
       or parser defined in first comment line of config file, or default parser.
     - two levels instance caching:
-      CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory.
+      CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory,
+      (one directory == one instance).
       read_config(config_file) reads and cache the specified config file as a mapping object.
     """
     dir_cache = {}
 
     def __init__(self, config_dir, parser):
         self.config_dir = config_dir
-        self.parser = parser
+        self.default_parser = parser
         self.cache = {}
 
     @classmethod
@@ -120,11 +129,18 @@ class CachedConfigReader(object):
             cls.dir_cache[path] = CachedConfigReader(path, parser)
         return cls.dir_cache[path]
 
-    def read_config(self, config, parser=None):
+    def read_config(self, config, parser=None, default={}):
+        """ reads and parse the config file, or get the cached configuration if available
+            you can specify default='raise' to raise an exception on missing file
+        """
         if config not in self.cache:
             path = os.path.join(self.config_dir, config)
+            if not os.path.exists(path):
+                if default == 'raise':
+                    raise RuntimeError("Configuration file not found: %s", path)
+                return Config(default)
             if parser is None:
-                parser = self.parser
+                parser = self.default_parser
                 try:
                     # try to get parser from file extension
                     parser = parsers[config.rsplit('.', 1)[1]]
