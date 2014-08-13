@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+# TODO
+# add an override_config method
+
 import ConfigParser
 import json
 import os
@@ -8,14 +11,20 @@ import yaml
 
 class Config(dict):
     """
-    A Config is a subclass of dict whose values are strings or recursively dict whose values are strings or ...
+    A Config is a subclass of dict whose values are simple python objects (strings, integers, booleans or floats),
+    or lists, or recursively dicts whose values are simple python objects or lists, or ...
     Keys are strings, and can be expressed as chains of keys separated by dots,
-    eg c['section.subsection.element'] is equivalent to c['section']['subsection']['element'].
-    You can write c['section.subsection']['element'] but you can't write c['section']['subsection.element']
-    as c['section'] is a dict, not a Config. You must write Config(c['section'])['subsection.element'].
-    Non leaf elements are always dict, only leaf elements can be lists.
+    eg c.get('section.subsection.option') is roughly the same as c.get('section').get('subsection').get('option')
+    salted with appropriate exception handling and default value management.
+    For Yaml formatted files, non leaf elements are always dicts, only leaf elements can be lists.
     """
-    _boolean_states = ConfigParser.RawConfigParser._boolean_states
+    _boolean_states = {'yes': True, 'true': True, 'on': True,
+                       'no': False, 'false': False, 'off': False}
+
+    @classmethod
+    def add_bool_literals(cls, true, false):
+        cls._boolean_states[true] = True
+        cls._boolean_states[false] = False
 
     def __getitem__(self, key):
         r = self
@@ -41,18 +50,19 @@ class Config(dict):
         except TypeError:
             raise ValueError('Not a leaf or not a float: %s' % k)
 
-    def get_boolean(self, k, d='0'):
+    def get_boolean(self, k, d=False):
+        v = self.get(k, d)
         try:
-            v = self.get(k, d).lower()
-        except AttributeError:
-            raise KeyError('Not a leaf or not a boolean: %s' % k)
-        if v not in self._boolean_states:
-            raise ValueError('Not a boolean %s: %s' % (k, v))
-        return self._boolean_states[v]
+            return bool(v)
+        except TypeError:
+            try:
+                return self._boolean_states[v.lower()]
+            except (KeyError, AttributeError):
+                raise ValueError('Not a leaf or not a boolean %s' % k)
     get_bool = get_boolean
 
     def get_json(self, k, d='[]'):
-        """ only used to get a list from an ini config file
+        """ use only to get a list from an ini config file
             use syntax: ["a","b"] (double quotes mandatory)
         """
         return json.loads(self.get(k, d))
@@ -90,10 +100,10 @@ class CachedConfigReader(object):
     """
     Implements configuration reading with features:
     - configurable parser:
-      use specified or default parser or parser specific to file extension,
-      or use parser defined in first comment line of config file.
+      use specified or parser specific to file extension,
+      or parser defined in first comment line of config file, or default parser.
     - two levels instance caching:
-      CachedConfigReader.get_config_reader(dir) returns a config reader instance for the specified directory.
+      CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory.
       read_config(config_file) reads and cache the specified config file as a mapping object.
     """
     dir_cache = {}
@@ -104,7 +114,7 @@ class CachedConfigReader(object):
         self.cache = {}
 
     @classmethod
-    def get_config_reader(cls, config_dir, parser=yaml_parser):
+    def get_instance(cls, config_dir, parser=yaml_parser):
         path = os.path.abspath(config_dir)
         if path not in cls.dir_cache:
             cls.dir_cache[path] = CachedConfigReader(path, parser)
@@ -112,19 +122,21 @@ class CachedConfigReader(object):
 
     def read_config(self, config, parser=None):
         if config not in self.cache:
+            path = os.path.join(self.config_dir, config)
             if parser is None:
                 parser = self.parser
-            path = os.path.join(self.config_dir, config)
-            try:
-                parser = parsers[config.rsplit('.', 1)[1]]
-            except (KeyError, IndexError):
-                with open(path, 'r') as f:
-                    first_line = f.readline()
-                if first_line.startswith('#'):
-                    for k, v in parsers:
-                        if k in first_line.lower():
-                            parser = v
-                            break
+                try:
+                    # try to get parser from file extension
+                    parser = parsers[config.rsplit('.', 1)[1]]
+                except (KeyError, IndexError):
+                    # else try to guess parser from first comment line
+                    with open(path, 'r') as f:
+                        first_line = f.readline()
+                    if first_line.startswith('#'):
+                        for k, v in parsers.iteritems():
+                            if k in first_line.lower():
+                                parser = v
+                                break
             self.cache[config] = parser(path)
         return self.cache[config]
 
