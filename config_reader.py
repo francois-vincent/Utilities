@@ -2,6 +2,7 @@
 
 # TODO
 # add an override_config method
+# better exception in __getitem__
 
 import ConfigParser
 import json
@@ -96,34 +97,47 @@ def json_parser(file):
     with open(file, 'r') as f:
         return Config(json.loads(f))
 
-parsers = dict(
+parsers_dict = dict(
     yaml=yaml_parser,
     ini=ini_parser,
     conf=ini_parser,
     json=json_parser
 )
 
+parsers_set = {yaml_parser, ini_parser, json_parser}
+
 
 class CachedConfigReader(object):
     """
     Implements configuration reading with features:
-    - configurable parser:
-      use specified or parser specific to file extension,
-      or parser defined in first comment line of config file, or default parser.
+    - configurable parser. By order of priority:
+      1- explicitly specified in read_config(),
+      2- use file extension,
+      3- specified in first comment line of config file,
+      4- instance default parser,
+      5- class default parser
     - two levels instance caching:
       CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory,
       (one directory == one instance).
       read_config(config_file) reads and cache the specified config file as a mapping object.
     """
     dir_cache = {}
+    default_parser = yaml_parser
 
     def __init__(self, config_dir, parser):
         self.config_dir = config_dir
-        self.default_parser = parser
+        self.default_parser = self.get_parser(parser)
         self.cache = {}
 
+    def get_parser(self, parser):
+        if parser is None:
+            return self.default_parser
+        if parser in parsers_set:
+            return parser
+        return parsers_dict[parser]
+
     @classmethod
-    def get_instance(cls, config_dir, parser=yaml_parser):
+    def get_instance(cls, config_dir, parser=None):
         path = os.path.abspath(config_dir)
         if path not in cls.dir_cache:
             cls.dir_cache[path] = CachedConfigReader(path, parser)
@@ -135,25 +149,28 @@ class CachedConfigReader(object):
         """
         if config not in self.cache:
             path = os.path.join(self.config_dir, config)
-            if not os.path.exists(path):
+            try:
+                if parser:
+                    parser = self.get_parser(parser)
+                else:
+                    parser = self.default_parser
+                    try:
+                        # try to get parser from file extension
+                        parser = parsers_dict[config.rsplit('.', 1)[1]]
+                    except (KeyError, IndexError):
+                        # else try to guess parser from first comment line
+                        with open(path, 'r') as f:
+                            first_line = f.readline()
+                        if first_line.startswith('#'):
+                            for k, v in parsers_dict.iteritems():
+                                if k in first_line.lower():
+                                    parser = v
+                                    break
+                self.cache[config] = parser(path)
+            except IOError:
                 if default == 'raise':
                     raise RuntimeError("Configuration file not found: %s", path)
-                return Config(default)
-            if parser is None:
-                parser = self.default_parser
-                try:
-                    # try to get parser from file extension
-                    parser = parsers[config.rsplit('.', 1)[1]]
-                except (KeyError, IndexError):
-                    # else try to guess parser from first comment line
-                    with open(path, 'r') as f:
-                        first_line = f.readline()
-                    if first_line.startswith('#'):
-                        for k, v in parsers.iteritems():
-                            if k in first_line.lower():
-                                parser = v
-                                break
-            self.cache[config] = parser(path)
+                self.cache[config] = Config(default)
         return self.cache[config]
 
     def reload(self, config=None):
