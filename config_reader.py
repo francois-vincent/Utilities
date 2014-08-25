@@ -2,7 +2,6 @@
 
 # TODO
 # add an override_config method
-# better exception in __getitem__
 
 import ConfigParser
 import json
@@ -33,8 +32,11 @@ class Config(dict):
 
     def __getitem__(self, key):
         r = self
-        for k in key.split('.'):
-            r = dict.__getitem__(r, k)
+        try:
+            for k in key.split('.'):
+                r = dict.__getitem__(r, k)
+        except KeyError as e:
+            raise KeyError("%s in '%s'" % (e, key))
         return r
 
     def get(self, k, d=None):
@@ -165,7 +167,7 @@ class CachedConfigReader(object):
 
     def read_config(self, config, parser=None, default={}):
         """ reads and parse the config file, or get the cached configuration if available
-            you can specify default='raise' to raise an exception on missing fileparser
+            you can specify default='raise' to raise an exception on missing file
         """
         if config not in self.cache:
             path = os.path.join(self.config_dir, config)
