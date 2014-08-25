@@ -10,6 +10,10 @@ import os
 import yaml
 
 
+class ConfigurationError(RuntimeError):
+    pass
+
+
 class Config(dict):
     """
     A Config is a subclass of dict whose values are simple python objects (strings, integers, booleans or floats),
@@ -129,13 +133,6 @@ class CachedConfigReader(object):
         self.default_parser = self.get_parser(parser)
         self.cache = {}
 
-    def get_parser(self, parser):
-        if parser is None:
-            return self.default_parser
-        if parser in parsers_set:
-            return parser
-        return parsers_dict[parser]
-
     @classmethod
     def get_instance(cls, config_dir, parser=None):
         path = os.path.abspath(config_dir)
@@ -143,9 +140,32 @@ class CachedConfigReader(object):
             cls.dir_cache[path] = CachedConfigReader(path, parser)
         return cls.dir_cache[path]
 
+    def get_parser(self, parser):
+        if parser is None:
+            return self.default_parser
+        if parser in parsers_set:
+            return parser
+        return parsers_dict[parser]
+
+    def get_parser_from_file(self, path):
+        parser = self.default_parser
+        try:
+            # try to get parser from file extension
+            parser = parsers_dict[path.rsplit('.', 1)[1]]
+        except (KeyError, IndexError):
+            # else try to guess parser from first comment line
+            with open(path, 'r') as f:
+                first_line = f.readline().lower()
+            if first_line.startswith('#'):
+                for k, v in parsers_dict.iteritems():
+                    if k in first_line:
+                        parser = v
+                        break
+        return parser
+
     def read_config(self, config, parser=None, default={}):
         """ reads and parse the config file, or get the cached configuration if available
-            you can specify default='raise' to raise an exception on missing file
+            you can specify default='raise' to raise an exception on missing fileparser
         """
         if config not in self.cache:
             path = os.path.join(self.config_dir, config)
@@ -153,24 +173,13 @@ class CachedConfigReader(object):
                 if parser:
                     parser = self.get_parser(parser)
                 else:
-                    parser = self.default_parser
-                    try:
-                        # try to get parser from file extension
-                        parser = parsers_dict[config.rsplit('.', 1)[1]]
-                    except (KeyError, IndexError):
-                        # else try to guess parser from first comment line
-                        with open(path, 'r') as f:
-                            first_line = f.readline()
-                        if first_line.startswith('#'):
-                            for k, v in parsers_dict.iteritems():
-                                if k in first_line.lower():
-                                    parser = v
-                                    break
+                    parser = self.get_parser_from_file(path)
                 self.cache[config] = parser(path)
             except IOError:
                 if default == 'raise':
-                    raise RuntimeError("Configuration file not found: %s", path)
+                    raise ConfigurationError("Configuration file not found: %s", path)
                 self.cache[config] = Config(default)
+
         return self.cache[config]
 
     def reload(self, config=None):
