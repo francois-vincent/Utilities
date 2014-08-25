@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
 # TODO
-# add an override_config method
+# find a better way to handle exceptions in get_json
 
 import ConfigParser
+import copy
+import functools
 import json
 import os
 import yaml
@@ -29,6 +31,48 @@ class Config(dict):
     def add_bool_literals(cls, true, false):
         cls._boolean_states[true] = True
         cls._boolean_states[false] = False
+
+    def _deepcopy(self):
+        return Config(copy.deepcopy(self))
+
+    def _update(self, other):
+        for key, value in other.iteritems():
+            r = self
+            chain = key.split('__')
+            for k in chain[:-1]:
+                try:
+                    r = dict.__getitem__(r, k)
+                except KeyError:
+                    r[k] = {}
+                    r = r[k]
+            r[chain[-1]] = value
+        return self
+
+    def override_config(self, **kwargs):
+        """ this returns an object that is a decorator as well as a context manager.
+            compound keys are expressed with double underscore notation,
+            ie 'section.subsection.option' is written 'section__subsection__option'.
+            the Config object itself is not overriden (it can't be), this is the
+            CachedConfigReader cached Config object that is overriden.
+        """
+        this = self
+        class ContextDecorator(object):
+            def __init__(self, **kwargs):
+                self.overrides = kwargs
+            def __enter__(self):
+                self.copy = this
+                overriden = this._deepcopy()._update(self.overrides)
+                this.instance.cache[this.name] = overriden
+                return overriden
+            def __exit__(self, *args):
+                this.instance.cache[this.name] = self.copy
+            def __call__(self, f):
+                @functools.wraps(f)
+                def decorated(*args, **kwds):
+                    with self:
+                        return f(*args, **kwds)
+                return decorated
+        return ContextDecorator(**kwargs)
 
     def __getitem__(self, key):
         r = self
@@ -165,6 +209,11 @@ class CachedConfigReader(object):
                         break
         return parser
 
+    def instanciate_config(self, name, config):
+        config.instance = self
+        config.name = name
+        self.cache[name] = config
+
     def read_config(self, config, parser=None, default={}):
         """ reads and parse the config file, or get the cached configuration if available
             you can specify default='raise' to raise an exception on missing file
@@ -176,13 +225,13 @@ class CachedConfigReader(object):
                     parser = self.get_parser(parser)
                 else:
                     parser = self.get_parser_from_file(path)
-                self.cache[config] = parser(path)
+                self.instanciate_config(config, parser(path))
             except IOError:
                 if default == 'raise':
                     raise ConfigurationError("Configuration file not found: %s", path)
-                self.cache[config] = Config(default)
-
+                self.instanciate_config(config, Config(default))
         return self.cache[config]
+    get_config = read_config
 
     def reload(self, config=None):
         if config:
