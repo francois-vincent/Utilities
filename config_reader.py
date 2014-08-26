@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# TODO
-# find a better way to handle exceptions in get_json
-
 import ConfigParser
 import copy
 import functools
@@ -15,17 +12,29 @@ class ConfigurationError(RuntimeError):
     pass
 
 
+class ConfigurationFileError(ConfigurationError):
+    pass
+
+
+class ConfigurationKeyError(ConfigurationError):
+    pass
+
+
+class ConfigurationValueError(ConfigurationError):
+    pass
+
+
 class Config(dict):
     """
     A Config is a subclass of dict whose values are simple python objects (strings, integers, booleans or floats),
     or lists, or recursively dicts whose values are simple python objects or lists, or ...
+    This rule apply to Yaml formatted files too: non leaf elements are always dicts, only leaf elements can be lists.
     Keys are strings, and can be expressed as chains of keys separated by dots,
     eg c.get('section.subsection.option') is roughly the same as c.get('section').get('subsection').get('option')
     salted with appropriate exception handling and default value management.
-    For Yaml formatted files, non leaf elements are always dicts, only leaf elements can be lists.
     """
-    _boolean_states = {'yes': True, 'true': True, 'on': True,
-                       'no': False, 'false': False, 'off': False}
+    _boolean_states = {'yes': True, 'true': True, 'on': True, '1': True,
+                       'no': False, 'false': False, 'off': False, '0': False}
 
     @classmethod
     def add_bool_literals(cls, true, false):
@@ -33,7 +42,7 @@ class Config(dict):
         cls._boolean_states[false] = False
 
     def _deepcopy(self):
-        return Config(copy.deepcopy(self))
+        return copy.deepcopy(self)
 
     def _update(self, other):
         for key, value in other.iteritems():
@@ -45,27 +54,31 @@ class Config(dict):
                 except KeyError:
                     r[k] = {}
                     r = r[k]
-            r[chain[-1]] = value
+            if value is None:
+                try:
+                    del r[chain[-1]]
+                except KeyError:
+                    pass
+            else:
+                r[chain[-1]] = value
         return self
 
     def override_config(self, **kwargs):
-        """ this returns an object that is a decorator as well as a context manager.
+        """ returns an object that is a decorator as well as a context manager.
             compound keys are expressed with double underscore notation,
             ie 'section.subsection.option' is written 'section__subsection__option'.
-            the Config object itself is not overriden (it can't be), this is the
-            CachedConfigReader cached Config object that is overriden.
+            you can specify a value=None to delete any chained key if it exists.
         """
         this = self
         class ContextDecorator(object):
             def __init__(self, **kwargs):
                 self.overrides = kwargs
             def __enter__(self):
-                self.copy = this
-                overriden = this._deepcopy()._update(self.overrides)
-                this.instance.cache[this.name] = overriden
-                return overriden
+                self.copy = this._deepcopy()
+                return this._update(self.overrides)
             def __exit__(self, *args):
-                this.instance.cache[this.name] = self.copy
+                this.clear()
+                this.update(self.copy)
             def __call__(self, f):
                 @functools.wraps(f)
                 def decorated(*args, **kwds):
@@ -75,56 +88,94 @@ class Config(dict):
         return ContextDecorator(**kwargs)
 
     def __getitem__(self, key):
+        """ general access operator (leaf and non leaf), can raise exception
+        """
         r = self
         try:
             for k in key.split('.'):
                 r = dict.__getitem__(r, k)
         except KeyError as e:
-            raise KeyError("%s in '%s'" % (e, key))
+            raise ConfigurationKeyError("%s in '%s'" % (e, key))
         return r
 
     def get(self, k, d=None):
+        """ general access operator (leaf and non leaf), always returns default if key anavailable
+        """
         try:
             return self[k]
         except KeyError:
             return d
 
-    def get_int(self, k, d=0):
+    def get_leaf(self, k, d=None):
+        """ general leaf access operator, raises or returns default if key unavailable
+        """
         try:
-            return int(self.get(k, d))
-        except TypeError:
-            if d == 'raise':
-                raise ValueError('Not a leaf or not an integer: %s' % k)
+            return self[k]
+        except ConfigurationKeyError:
+            if d in ('__raises_onkey__', '__raises_all__'):
+                raise
             return d
+
+    def _default_or_raises(self, key, kind, d):
+        if d in ('__raises_onvalue__', '__raises_all__'):
+            raise ConfigurationValueError('Not a leaf or not a %s: %s' % (kind, key))
+        return d
+
+    def get_string(self, k, d=''):
+        """ leaf string access operator, raises or returns default if key unavailable or not a string
+        """
+        v = self.get_leaf(k, d)
+        if isinstance(v, basestring):
+            return v
+        return self._default_or_raises(k, 'string', d)
+
+    def get_int(self, k, d=0):
+        """ leaf integer access operator, raises or returns default if key unavailable or not an integer
+        """
+        v = self.get_leaf(k, d)
+        try:
+            return int(v)
+        except TypeError:
+            return self._default_or_raises(k, 'integer', d)
 
     def get_float(self, k, d=0.0):
+        """ leaf float access operator, raises or returns default if key unavailable or not a float
+        """
+        v = self.get_leaf(k, d)
         try:
-            return float(self.get(k, d))
+            return float(v)
         except TypeError:
-            if d == 'raise':
-                raise ValueError('Not a leaf or not a float: %s' % k)
-            return d
+            return self._default_or_raises(k, 'float', d)
 
     def get_boolean(self, k, d=False):
+        """ leaf boolean access operator, raises or returns default if key unavailable or not a boolean
+        """
         v = self.get(k, d)
         if isinstance(v, bool):
             return v
+        if v in (0, 1):
+            return bool(v)
         try:
             return self._boolean_states[v.lower()]
         except (KeyError, AttributeError):
-            if d == 'raise':
-                raise ValueError('Not a leaf or not a boolean: %s' % k)
-            return d
+            return self._default_or_raises(k, 'boolean', d)
     get_bool = get_boolean
 
-    def get_json(self, k, d='[]'):
-        """ use only to get a list from an ini config file
-            use syntax: ["a","b"] (double quotes mandatory)
+    def get_list(self, k, d=None):
+        """ leaf list access operator, raises or returns default if key unavailable or not a list.
+            ini config files must use syntax: ["a","b"] (double quotes mandatory)
         """
+        d = d if d else []
+        v = self.get_leaf(k, d)
+        if isinstance(v, list):
+            return v
         try:
-            return json.loads(self.get(k, d))
+            v = json.loads(v)
         except ValueError:
-            return json.loads(d)
+            v = None
+        if isinstance(v, list):
+            return v
+        return self._default_or_raises(k, 'list', d)
 
 
 def yaml_parser(file):
@@ -210,27 +261,25 @@ class CachedConfigReader(object):
         return parser
 
     def instanciate_config(self, name, config):
-        config.instance = self
-        config.name = name
         self.cache[name] = config
 
-    def read_config(self, config, parser=None, default={}):
+    def read_config(self, config_name, parser=None, default={}):
         """ reads and parse the config file, or get the cached configuration if available
             you can specify default='raise' to raise an exception on missing file
         """
-        if config not in self.cache:
-            path = os.path.join(self.config_dir, config)
+        if config_name not in self.cache:
+            path = os.path.join(self.config_dir, config_name)
             try:
                 if parser:
                     parser = self.get_parser(parser)
                 else:
                     parser = self.get_parser_from_file(path)
-                self.instanciate_config(config, parser(path))
+                self.instanciate_config(config_name, parser(path))
             except IOError:
-                if default == 'raise':
-                    raise ConfigurationError("Configuration file not found: %s", path)
-                self.instanciate_config(config, Config(default))
-        return self.cache[config]
+                if default == '__raises__':
+                    raise ConfigurationFileError("Configuration file not found: %s", path)
+                self.instanciate_config(config_name, Config(default))
+        return self.cache[config_name]
     get_config = read_config
 
     def reload(self, config=None):
@@ -238,4 +287,4 @@ class CachedConfigReader(object):
             del self.cache[config]
         else:
             self.cache = {}
-    reset = clear = reload
+    reset = clean = clear = reload
