@@ -103,21 +103,21 @@ class Config(dict):
         """
         try:
             return self[k]
-        except KeyError:
+        except ConfigurationKeyError:
             return d
 
     def get_leaf(self, k, d=None):
-        """ general leaf access operator, raises or returns default if key unavailable
+        """ general leaf access operator (no typecheck), raises or returns default if key unavailable
         """
         try:
             return self[k]
         except ConfigurationKeyError:
-            if d in ('__raises_onkey__', '__raises_all__'):
+            if d == '__raise__':
                 raise
             return d
 
     def _default_or_raises(self, key, kind, d):
-        if d in ('__raises_onvalue__', '__raises_all__'):
+        if d == '__raise__':
             raise ConfigurationValueError('Not a leaf or not a %s: %s' % (kind, key))
         return d
 
@@ -129,7 +129,7 @@ class Config(dict):
             return v
         return self._default_or_raises(k, 'string', d)
 
-    def get_int(self, k, d=0):
+    def get_integer(self, k, d=0):
         """ leaf integer access operator, raises or returns default if key unavailable or not an integer
         """
         v = self.get_leaf(k, d)
@@ -137,6 +137,7 @@ class Config(dict):
             return int(v)
         except TypeError:
             return self._default_or_raises(k, 'integer', d)
+    get_int = get_integer
 
     def get_float(self, k, d=0.0):
         """ leaf float access operator, raises or returns default if key unavailable or not a float
@@ -150,7 +151,7 @@ class Config(dict):
     def get_boolean(self, k, d=False):
         """ leaf boolean access operator, raises or returns default if key unavailable or not a boolean
         """
-        v = self.get(k, d)
+        v = self.get_leaf(k, d)
         if isinstance(v, bool):
             return v
         if v in (0, 1):
@@ -171,7 +172,7 @@ class Config(dict):
             return v
         try:
             v = json.loads(v)
-        except ValueError:
+        except (ValueError, TypeError):
             v = None
         if isinstance(v, list):
             return v
@@ -276,7 +277,7 @@ class CachedConfigReader(object):
                     parser = self.get_parser_from_file(path)
                 self.instanciate_config(config_name, parser(path))
             except IOError:
-                if default == '__raises__':
+                if default == '__raise__':
                     raise ConfigurationFileError("Configuration file not found: %s", path)
                 self.instanciate_config(config_name, Config(default))
         return self.cache[config_name]
