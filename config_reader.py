@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # TODO
+# use special keyword to guess parser from file
 # faire des tests
 # add a date type with tz in Config
 
@@ -8,7 +9,7 @@ import copy
 import functools
 import os
 
-# parsers
+# parser modules
 try:
     import simplejson as json
 except ImportError:
@@ -31,6 +32,35 @@ except ImportError:
         @staticmethod
         def parse(f):
             raise RuntimeError("XML configuration file requires xmltodict parser (pip install xmltodict)")
+
+
+# predefined parser functions
+# a parser function accepts a config file full path as unique parameter and returns a Config instance
+
+def json_parser(file):
+    with open(file, 'r') as f:
+        return Config(json.load(f))
+
+
+def ini_parser(file):
+    # don't need OrderedDict
+    cp = ConfigParser.RawConfigParser(dict_type=dict)
+    with open(file, 'r') as f:
+        cp._read(f, file)
+    # remove some stuff
+    for s in cp._sections.itervalues():
+        del s['__name__']
+    return Config(cp._sections)
+
+
+def yaml_parser(file):
+    with open(file, 'r') as f:
+        return Config(yaml.safe_load(f))
+
+
+def xml_parser(file):
+    with open(file, 'r') as f:
+        return Config(xmltodict.parse(f.read()))
 
 
 class ConfigurationError(RuntimeError):
@@ -93,6 +123,13 @@ class Config(dict):
             compound keys are expressed with double underscore notation,
             ie 'section.subsection.option' is written 'section__subsection__option'.
             you can specify a value=None to delete any chained key if it exists.
+            usage as context manager:
+            with c.override_config(section__subsection__option=value):
+                ...
+            usage as decorator:
+            @c.override_config(section__subsection__option=value)
+            def function_or_method(*args, **kwargs):
+                ...
         """
         this = self
         class ContextDecorator(object):
@@ -204,43 +241,6 @@ class Config(dict):
         return self._default_or_raises(k, 'list', d)
 
 
-def yaml_parser(file):
-    with open(file, 'r') as f:
-        return Config(yaml.safe_load(f))
-
-
-def ini_parser(file):
-    # don't need OrderedDict
-    cp = ConfigParser.RawConfigParser(dict_type=dict)
-    with open(file, 'r') as f:
-        cp._read(f, file)
-    # remove some stuff
-    for s in cp._sections.itervalues():
-        del s['__name__']
-    return Config(cp._sections)
-
-
-def json_parser(file):
-    with open(file, 'r') as f:
-        return Config(json.load(f))
-
-
-def xml_parser(file):
-    with open(file, 'r') as f:
-        return Config(xmltodict.parse(f.read()))
-
-parsers_dict = dict(
-    yaml=yaml_parser,
-    yml=yaml_parser,
-    ini=ini_parser,
-    conf=ini_parser,
-    json=json_parser,
-    xml=xml_parser,
-)
-
-parsers_set = {yaml_parser, ini_parser, json_parser}
-
-
 class CachedConfigReader(object):
     """
     Implements configuration reading with features:
@@ -255,6 +255,14 @@ class CachedConfigReader(object):
       (one directory == one instance).
       cr.read_config(config_file) reads and cache the specified config file as a mapping object.
     """
+    parsers_dict = dict(
+        yaml=yaml_parser,
+        yml=yaml_parser,
+        ini=ini_parser,
+        conf=ini_parser,
+        json=json_parser,
+        xml=xml_parser,
+    )
     dir_cache = {}
     default_parser = yaml_parser
 
@@ -262,6 +270,10 @@ class CachedConfigReader(object):
         self.config_dir = config_dir
         self.default_parser = self.get_parser(parser)
         self.cache = {}
+
+    @classmethod
+    def add_parser(cls, name, parser):
+        CachedConfigReader.parsers_dict[name] = parser
 
     @classmethod
     def get_instance(cls, config_dir, parser=None):
@@ -273,21 +285,21 @@ class CachedConfigReader(object):
     def get_parser(self, parser):
         if parser is None:
             return self.default_parser
-        if parser in parsers_set:
-            return parser
-        return parsers_dict[parser]
+        if isinstance(parser, basestring):
+            return CachedConfigReader.parsers_dict[parser]
+        return parser
 
     def get_parser_from_file(self, path):
         parser = self.default_parser
         try:
             # try to get parser from file extension
-            parser = parsers_dict[path.rsplit('.', 1)[1]]
+            parser = CachedConfigReader.parsers_dict[path.rsplit('.', 1)[1]]
         except (KeyError, IndexError):
             # else try to guess parser from first comment line
             with open(path, 'r') as f:
                 first_line = f.readline().lower()
             if first_line.startswith('#'):
-                for k, v in parsers_dict.iteritems():
+                for k, v in CachedConfigReader.parsers_dict.iteritems():
                     if k in first_line:
                         parser = v
                         break
