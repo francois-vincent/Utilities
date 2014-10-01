@@ -1,11 +1,36 @@
 # -*- coding: utf-8 -*-
 
-import ConfigParser
+# TODO
+# faire des tests
+# add a date type with tz in Config
+
 import copy
 import functools
-import json
 import os
-import yaml
+
+# parsers
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
+import ConfigParser
+
+try:
+    import yaml
+except ImportError:
+    class yaml(object):
+        @staticmethod
+        def safe_load(f):
+            raise RuntimeError("YAML configuration file requires PyYAML parser (pip install pyyaml)")
+
+try:
+    import xmltodict
+except ImportError:
+    class xmltodict(object):
+        @staticmethod
+        def parse(f):
+            raise RuntimeError("XML configuration file requires xmltodict parser (pip install xmltodict)")
 
 
 class ConfigurationError(RuntimeError):
@@ -197,13 +222,20 @@ def ini_parser(file):
 
 def json_parser(file):
     with open(file, 'r') as f:
-        return Config(json.loads(f))
+        return Config(json.load(f))
+
+
+def xml_parser(file):
+    with open(file, 'r') as f:
+        return Config(xmltodict.parse(f.read()))
 
 parsers_dict = dict(
     yaml=yaml_parser,
+    yml=yaml_parser,
     ini=ini_parser,
     conf=ini_parser,
-    json=json_parser
+    json=json_parser,
+    xml=xml_parser,
 )
 
 parsers_set = {yaml_parser, ini_parser, json_parser}
@@ -221,7 +253,7 @@ class CachedConfigReader(object):
     - two levels instance caching:
       CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory,
       (one directory == one instance).
-      read_config(config_file) reads and cache the specified config file as a mapping object.
+      cr.read_config(config_file) reads and cache the specified config file as a mapping object.
     """
     dir_cache = {}
     default_parser = yaml_parser
@@ -265,8 +297,8 @@ class CachedConfigReader(object):
         self.cache[name] = config
 
     def read_config(self, config_name, parser=None, default={}):
-        """ reads and parse the config file, or get the cached configuration if available
-            you can specify default='raise' to raise an exception on missing file
+        """ reads and parse the config file, or get the cached configuration if available.
+            you can specify default='__raise__' to raise an exception on missing file
         """
         if config_name not in self.cache:
             path = os.path.join(self.config_dir, config_name)
