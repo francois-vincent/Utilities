@@ -3,7 +3,7 @@
 import mock
 import unittest
 
-from config_reader import CachedConfigReader, ini_parser, json_parser
+from config_reader import CachedConfigReader, ini_parser, json_parser, ConfigurationFileError
 
 
 yaml_file = \
@@ -73,6 +73,10 @@ def mock_open(data):
     return open
 
 
+def mock_open_error(*args):
+    raise IOError
+
+
 class ConfigReaderTestCase(unittest.TestCase):
 
     def test_class_default_parser(self):
@@ -82,14 +86,43 @@ class ConfigReaderTestCase(unittest.TestCase):
             conf = ccr.read_config('conf.ini')
             self.assertEqual(conf.get('owner.name'), 'juan dona')
 
+    def test_class_set_default_parser(self):
+        with mock.patch('__builtin__.open', mock_open(json_file)):
+            ccr = CachedConfigReader.get_instance('dummy')
+            CachedConfigReader.set_default_parser('json')
+            self.assertEqual(ccr.default_parser, json_parser)
+            conf = ccr.read_config('conf.json')
+            self.assertEqual(conf.get('menu.value'), 'File')
+
+    def test_wrong_folder_raise(self):
+        self.assertRaises(IOError, CachedConfigReader.get_instance, '/doesnotexists', True)
+
+    def test_wrong_file_noraise(self):
+        with mock.patch('__builtin__.open', mock_open_error):
+            ccr = CachedConfigReader.get_instance('dummy')
+            conf = ccr.read_config('conf2.ini')
+            self.assertEqual(dict(conf), {})
+
+    def test_wrong_file_raise(self):
+        with mock.patch('__builtin__.open', mock_open_error):
+            ccr = CachedConfigReader.get_instance('dummy')
+            self.assertRaises(ConfigurationFileError, ccr.read_config, 'conf3.ini', None, '__raise__')
+
+    def test_wrong_parser_noraise(self):
+        pass
+
+    def test_wrong_parser_raise(self):
+        pass
+
     def test_ini_parser(self):
         pass
 
     def test_json_parser(self):
         with mock.patch('__builtin__.open', mock_open(json_file)):
             ccr = CachedConfigReader.get_instance('dummy')
-            conf = ccr.read_config('conf.json', 'json')
+            conf = ccr.read_config('conf.json', 'json')     # override default parser
             self.assertEqual(conf.get('menu.value'), 'File')
+            self.assertEqual(conf.get('menu.id'), 1)
 
     def test_yaml_parser(self):
         pass

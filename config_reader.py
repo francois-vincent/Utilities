@@ -137,7 +137,7 @@ class Config(dict):
         """ returns an object that is a decorator as well as a context manager.
             compound keys are expressed with double underscore notation,
             ie 'section.subsection.option' is written 'section__subsection__option'.
-            you can specify a value=None to delete any chained key if it exists.
+            you can specify a value as None to delete any chained key if it exists.
             usage as context manager:
             with c.override_config(section__subsection__option=value):
                 ...
@@ -311,11 +311,14 @@ class CachedConfigReader(object):
 
     @classmethod
     def set_default_parser(cls, parser):
-        cls.default_parser = parser
+        cls.default_parser = staticmethod(cls.get_parser(parser))
 
     @classmethod
-    def get_instance(cls, config_dir):
+    def get_instance(cls, config_dir, check_dir=False):
         path = os.path.abspath(config_dir)
+        if check_dir:
+            if not os.access(path, os.R_OK):
+                raise IOError("%s: read access forbidden or folder missing" % path)
         if path not in cls.dir_cache:
             cls.dir_cache[path] = CachedConfigReader(path)
         return cls.dir_cache[path]
@@ -336,12 +339,13 @@ class CachedConfigReader(object):
                         break
         return parser
 
-    def get_parser(self, parser):
+    @classmethod
+    def get_parser(cls, parser):
         if parser is None:
-            return self.default_parser
+            return cls.default_parser
         if isinstance(parser, basestring):
             try:
-                return self.parsers_dict[self.parsers_aliases[parser]]
+                return cls.parsers_dict[cls.parsers_aliases[parser]]
             except KeyError:
                 return None
         return parser
@@ -360,11 +364,16 @@ class CachedConfigReader(object):
                     parser = self.get_parser(parser)
                 if parser is None:
                     parser = self.get_parser_from_file(path)
-                self.instanciate_config(config_name, parser(path))
+                parser = parser(path)
             except IOError:
                 if default == '__raise__':
-                    raise ConfigurationFileError("Configuration file not found: %s", path)
-                self.instanciate_config(config_name, Config(default))
+                    raise ConfigurationFileError("Configuration file not found: %s" % path)
+                parser = Config(default)
+            except Exception as e:
+                if default == '__raise__':
+                    raise ConfigurationFileError("Parser error in file %s: %s" % (path, e))
+                parser = Config(default)
+            self.instanciate_config(config_name, parser)
         return self.cache[config_name]
     get_config = read_config
 
