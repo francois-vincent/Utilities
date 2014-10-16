@@ -1,9 +1,24 @@
 # -*- coding: utf-8 -*-
 
 # TODO
-# use special keyword to guess parser from file
+# guess parser from file (try every parser in sequence), order is configurable
 # faire des tests
 # add a date type with tz in Config
+
+"""
+méthode de recherche du parser :
+si parser.startswith('guess')
+  si extension pas dans la liste, échec
+  si décodage avec extension échoue, échec
+si échec et parser.startswith('guess')
+  si comment pas dans la liste, échec
+  si décodage avec comment échoue, échec
+si échec et parser == 'guess_hard'
+  liste des parsers = liste complète - set(extension, comment)
+  pour chaque parser de la liste, tenter la lecture
+si échec
+  raise ConfigurationFileError
+"""
 
 import copy
 import functools
@@ -240,69 +255,95 @@ class Config(dict):
             return v
         return self._default_or_raises(k, 'list', d)
 
+    def get_date(self, k, d=None):
+        pass
+
 
 class CachedConfigReader(object):
+    # Fixme
     """
     Implements configuration reading with features:
     - configurable parser. By order of priority:
       1- explicitly specified in read_config(),
       2- use file extension,
       3- specified in first comment line of config file,
-      4- instance default parser,
-      5- class default parser
+      4- class default parser
     - two levels instance caching:
       CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory,
       (one directory == one instance).
       cr.read_config(config_file) reads and cache the specified config file as a mapping object.
     """
     parsers_dict = dict(
-        yaml=yaml_parser,
-        yml=yaml_parser,
         ini=ini_parser,
-        conf=ini_parser,
+        yaml=yaml_parser,
         json=json_parser,
         xml=xml_parser,
     )
+    parsers_aliases = dict(
+        ini='ini',
+        conf='ini',
+        yaml='yaml',
+        yml='yaml',
+        json='json',
+        xml='xml',
+    )
     dir_cache = {}
-    default_parser = yaml_parser
+    default_parser = staticmethod(ini_parser)
+    parser_resolution_order = ['ini', 'json', 'yaml', 'xml']
 
-    def __init__(self, config_dir, parser):
+    def __init__(self, config_dir):
         self.config_dir = config_dir
-        self.default_parser = self.get_parser(parser)
         self.cache = {}
 
     @classmethod
-    def add_parser(cls, name, parser):
-        CachedConfigReader.parsers_dict[name] = parser
+    def add_parser(cls, name, parser, aliases=(), index=0):
+        cls.parsers_dict[name] = parser
+        for a in aliases:
+            cls.parsers_aliases[a] = name
+        if index < 0:
+            # stupid insert() negative index management... it cannot append !
+            if index == -1:
+                cls.parser_resolution_order.append(name)
+                return
+            else:
+                index += 1
+        cls.parser_resolution_order.insert(index, name)
 
     @classmethod
-    def get_instance(cls, config_dir, parser=None):
+    def set_default_parser(cls, parser):
+        cls.default_parser = parser
+
+    @classmethod
+    def get_instance(cls, config_dir):
         path = os.path.abspath(config_dir)
         if path not in cls.dir_cache:
-            cls.dir_cache[path] = CachedConfigReader(path, parser)
+            cls.dir_cache[path] = CachedConfigReader(path)
         return cls.dir_cache[path]
-
-    def get_parser(self, parser):
-        if parser is None:
-            return self.default_parser
-        if isinstance(parser, basestring):
-            return CachedConfigReader.parsers_dict[parser]
-        return parser
 
     def get_parser_from_file(self, path):
         parser = self.default_parser
         try:
             # try to get parser from file extension
-            parser = CachedConfigReader.parsers_dict[path.rsplit('.', 1)[1]]
+            parser = self.parsers_dict[path.rsplit('.', 1)[1]]
         except (KeyError, IndexError):
             # else try to guess parser from first comment line
             with open(path, 'r') as f:
                 first_line = f.readline().lower()
-            if first_line.startswith('#'):
-                for k, v in CachedConfigReader.parsers_dict.iteritems():
+            if first_line[0] in ('#', ';'):
+                for k, v in self.parsers_dict.iteritems():
                     if k in first_line:
                         parser = v
                         break
+        return parser
+
+    def get_parser(self, parser):
+        if parser is None:
+            return self.default_parser
+        if isinstance(parser, basestring):
+            try:
+                return self.parsers_dict[self.parsers_aliases[parser]]
+            except KeyError:
+                return None
         return parser
 
     def instanciate_config(self, name, config):
@@ -317,7 +358,7 @@ class CachedConfigReader(object):
             try:
                 if parser:
                     parser = self.get_parser(parser)
-                else:
+                if parser is None:
                     parser = self.get_parser_from_file(path)
                 self.instanciate_config(config_name, parser(path))
             except IOError:
