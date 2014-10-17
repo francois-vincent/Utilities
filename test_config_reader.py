@@ -5,6 +5,8 @@ import unittest
 
 from config_reader import CachedConfigReader, ini_parser, json_parser, ConfigurationFileError
 
+CachedConfigReader.check_dir = False
+
 
 yaml_file = \
 """# YAML file
@@ -22,6 +24,7 @@ port=143
 name = "acme payroll.dat"
 """
 
+# JSON files do not accept comments
 json_file = \
 """
 {
@@ -79,23 +82,38 @@ def mock_open_error(*args):
 
 class ConfigReaderTestCase(unittest.TestCase):
 
-    def test_class_default_parser(self):
+    def test_default_parser(self):
         with mock.patch('__builtin__.open', mock_open(ini_file)):
             ccr = CachedConfigReader.get_instance('dummy')
             self.assertEqual(ccr.default_parser, ini_parser)
             conf = ccr.read_config('conf.ini')
             self.assertEqual(conf.get('owner.name'), 'juan dona')
 
-    def test_class_set_default_parser(self):
+    def test_set_default_parser(self):
         with mock.patch('__builtin__.open', mock_open(json_file)):
             ccr = CachedConfigReader.get_instance('dummy')
             CachedConfigReader.set_default_parser('json')
             self.assertEqual(ccr.default_parser, json_parser)
             conf = ccr.read_config('conf.json')
             self.assertEqual(conf.get('menu.value'), 'File')
+            CachedConfigReader.set_default_parser('ini')
+
+    def test_cached_instance(self):
+        with mock.patch('__builtin__.open', mock_open(ini_file)):
+            ccr = CachedConfigReader.get_instance('dummy')
+            conf = ccr.read_config('conf4.ini')
+            self.assertEqual(conf.get('owner.name'), 'juan dona')
+            ccr2 = CachedConfigReader.get_instance('dummy')
+            conf2 = ccr2.read_config('conf4.ini', 'random_parser')    # parser is ignored
+            self.assertIs(ccr, ccr2)
+            self.assertIs(conf, conf2)
 
     def test_wrong_folder_raise(self):
-        self.assertRaises(IOError, CachedConfigReader.get_instance, '/doesnotexists', True)
+        CachedConfigReader.check_dir = True
+        try:
+            self.assertRaises(IOError, CachedConfigReader.get_instance, '/doesnotexists')
+        finally:
+            CachedConfigReader.check_dir = False
 
     def test_wrong_file_noraise(self):
         with mock.patch('__builtin__.open', mock_open_error):

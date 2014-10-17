@@ -2,23 +2,9 @@
 
 # TODO
 # guess parser from file (try every parser in sequence), order is configurable
-# faire des tests
 # add a date type with tz in Config
-
-"""
-méthode de recherche du parser :
-si parser.startswith('guess')
-  si extension pas dans la liste, échec
-  si décodage avec extension échoue, échec
-si échec et parser.startswith('guess')
-  si comment pas dans la liste, échec
-  si décodage avec comment échoue, échec
-si échec et parser == 'guess_hard'
-  liste des parsers = liste complète - set(extension, comment)
-  pour chaque parser de la liste, tenter la lecture
-si échec
-  raise ConfigurationFileError
-"""
+# revoir la stratégie de recherche de parser
+# cls.default_parser peut être 'guess'
 
 import copy
 import functools
@@ -288,6 +274,7 @@ class CachedConfigReader(object):
         xml='xml',
     )
     dir_cache = {}
+    check_dir = True
     default_parser = staticmethod(ini_parser)
     parser_resolution_order = ['ini', 'json', 'yaml', 'xml']
 
@@ -301,10 +288,9 @@ class CachedConfigReader(object):
         for a in aliases:
             cls.parsers_aliases[a] = name
         if index < 0:
-            # stupid insert() negative index management... it cannot append !
+            # poor insert() negative index management... it cannot append !
             if index == -1:
-                cls.parser_resolution_order.append(name)
-                return
+                return cls.parser_resolution_order.append(name)
             else:
                 index += 1
         cls.parser_resolution_order.insert(index, name)
@@ -314,20 +300,40 @@ class CachedConfigReader(object):
         cls.default_parser = staticmethod(cls.get_parser(parser))
 
     @classmethod
-    def get_instance(cls, config_dir, check_dir=False):
+    def get_instance(cls, config_dir):
         path = os.path.abspath(config_dir)
-        if check_dir:
-            if not os.access(path, os.R_OK):
-                raise IOError("%s: read access forbidden or folder missing" % path)
         if path not in cls.dir_cache:
+            if cls.check_dir:
+                if not os.access(path, os.R_OK):
+                    raise IOError("%s: read access forbidden or folder missing" % path)
             cls.dir_cache[path] = CachedConfigReader(path)
         return cls.dir_cache[path]
+
+    @classmethod
+    def get_parser_from_string(cls, parser):
+        return cls.parsers_dict[cls.parsers_aliases[parser]]
+
+    def toto(self, path, parser):
+        """
+        méthode de recherche du parser :
+        si parser.startswith('guess')
+          si extension pas dans la liste, échec
+          si décodage avec extension échoue, échec
+        si échec et parser.startswith('guess')
+          si comment pas dans la liste, échec
+          si décodage avec comment échoue, échec
+        si échec et parser == 'guess_hard'
+          liste des parsers = liste complète - set(extension, comment)
+          pour chaque parser de la liste, tenter la lecture
+        si échec
+          raise ConfigurationFileError
+        """
 
     def get_parser_from_file(self, path):
         parser = self.default_parser
         try:
             # try to get parser from file extension
-            parser = self.parsers_dict[path.rsplit('.', 1)[1]]
+            parser = self.get_parser_from_string(path.rsplit('.', 1)[1])
         except (KeyError, IndexError):
             # else try to guess parser from first comment line
             with open(path, 'r') as f:
@@ -341,13 +347,15 @@ class CachedConfigReader(object):
 
     @classmethod
     def get_parser(cls, parser):
+        """this method accepts None, a parser function or a string
+        """
         if parser is None:
             return cls.default_parser
         if isinstance(parser, basestring):
             try:
-                return cls.parsers_dict[cls.parsers_aliases[parser]]
+                return cls.get_parser_from_string(parser)
             except KeyError:
-                return None
+                pass
         return parser
 
     def instanciate_config(self, name, config):
@@ -355,15 +363,16 @@ class CachedConfigReader(object):
 
     def read_config(self, config_name, parser=None, default={}):
         """ reads and parse the config file, or get the cached configuration if available.
-            you can specify default='__raise__' to raise an exception on missing file
+            you can specify default='__raise__' to raise an exception on missing file or wrong parser
         """
         if config_name not in self.cache:
             path = os.path.join(self.config_dir, config_name)
             try:
-                if parser:
-                    parser = self.get_parser(parser)
-                if parser is None:
+                parser = self.get_parser(parser)
+                if isinstance(parser, basestring):
                     parser = self.get_parser_from_file(path)
+                if parser is None:
+                    raise ConfigurationFileError("No parser found for file: %s" % path)
                 parser = parser(path)
             except IOError:
                 if default == '__raise__':
