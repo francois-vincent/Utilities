@@ -50,7 +50,7 @@ if __name__ == '__main__':
     assert d == {'a': 1, 'c': 3, 'b': 2, 'd': 4}
     d -= d2
     assert d == {'a': 1, 'b': 2, 'd': 4}
-    d = bdict(a=1, b=2, c=3)
+    d = bdict(dict(a=1, b=2), c=3)
     d.remove('a')
     assert d == {'c': 3, 'b': 2}
     d = bdict(a=1, b=2, c=3)
