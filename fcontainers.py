@@ -1,30 +1,77 @@
 # -*- coding: utf-8 -*-
 
+__all__ = ['dict', 'list', 'set', 'DuplicateValueError']
+
+
 olddict = dict
 oldlist = list
+oldset = set
+
+
+class DuplicateValueError(ValueError):
+    pass
+
+
+class ReverseDictFactory(object):
+    from collections import defaultdict
+
+    class _count(object):
+        def __init__(self):
+            self.value = 0
+        def add(self, k, v):
+            self.value += 1
+        def val(self):
+            return self.value
+
+    class _list(list):
+        def add(self, k, v):
+            self.append(k)
+        def val(self):
+            return self
+
+    class _raise(object):
+        def __init__(self):
+            self.value = None
+        def add(self, k, v):
+            if self.value is not None:
+                raise DuplicateValueError("Duplicate value %s found for keys '%s' and '%s'" % (v, k, self.value))
+            self.value = k
+        def val(self):
+            return self.value
+
+    @classmethod
+    def get_dict(cls, case):
+        return cls.defaultdict({
+            'raise': cls._raise,
+            'count': cls._count,
+            'list': cls._list,
+        }[case])
 
 
 class dict(olddict):
     """
     Replacement class for dict
-    In place methods returns 'self' instead of None
+    In place methods return 'self' instead of None
     New methods and operators:
     - remove: delete keys from an iterable
     - project: keep only keys in iterable
-    - __add__; returns new dictionary, composed of a copy this dictionary updated with other, or updated with a dict.fromkey(other)
+    - reverse: returns a new dictionary, with exchanged keys and values
+    - __add__; returns new dictionary, composed of a copy this dictionary updated with other,
+               or updated with a dict.fromkey(other)
     - __sub__: operator version of remove
     - __and__: returns new dictionary, with keys not in other removed (projection)
     - __iadd__: update this with other, or with a dict.fromkey(other), identical to update if other is a dict
     - __isub__: operator version of remove
+    - __iand__: operator version of project
     """
-    olddict = olddict
+    dict = olddict
 
     def clear(self):
-        dict.olddict.clear()
+        olddict.clear(self)
         return self
 
     def update(self, E={}, **F):
-        dict.olddict.update(self, E, **F)
+        olddict.update(self, E, **F)
         return self
 
     def remove(self, iterable):
@@ -34,10 +81,24 @@ class dict(olddict):
         return self
 
     def project(self, iterable):
-        for k in self:
-            if k not in set(iterable):
-                self.__delitem__(k)
+        for k in set(self) - set(iterable):
+            self.__delitem__(k)
         return self
+
+    def reverse(self, duplicate='silent'):
+        """ reverse the dictionary (exchange keys and values)
+            what's happening to duplicate values ?
+            if duplicate = 'silent' an arbitrary value among duplicates is chosen
+            if duplicate = 'raise', raise a DuplicateValueError exception
+            if duplicate = 'count', count number of keys (if duplicates, this number is >1)
+            if duplicate == 'list', append keys in a list
+        """
+        if duplicate == 'silent':
+            return dict((v, k) for k, v in self.iteritems())
+        data = ReverseDictFactory.get_dict(duplicate)
+        for k, v in self.iteritems():
+            data[v].add(k, v)
+        return {k: v.val() for k, v in data.iteritems()}
 
     def __add__(self, other):
         if not issubclass(other.__class__, dict):
@@ -62,16 +123,17 @@ class dict(olddict):
 class list(oldlist):
     """
     Replacement class for list
-    In place methods returns 'self' instead of None
+    In place methods return 'self' instead of None
+    - __add__: accepts any iterable, not only lists
     """
-    oldlist = oldlist
+    list = oldlist
 
     def append(self, x):
-        list.oldlist.append(x)
+        oldlist.append(x)
         return self
 
     def extend(self, iterable):
-        list.oldlist.extend(self, iterable)
+        oldlist.extend(self, iterable)
         return self
 
     def insert(self, i, x):
@@ -79,23 +141,42 @@ class list(oldlist):
             if i == -1:
                 return self.append(x)
             i += 1
-        list.oldlist.insert(self, i, x)
+        oldlist.insert(self, i, x)
         return self
 
     def remove(self, value):
-        list.oldlist.remove(self, value)
+        oldlist.remove(self, value)
         return self
 
     def reverse(self):
-        list.oldlist.reverse()
+        oldlist.reverse()
         return self
 
     def sort(self, **p):
-        list.oldlist.sort(self, **p)
+        oldlist.sort(self, **p)
         return self
 
     def __add__(self, iterable):
         return list(self).extend(iterable)
 
-del olddict
-del oldlist
+
+class set(oldset):
+    """
+    Replacement class for set
+    In place methods return 'self' instead of None
+    """
+    set = oldset
+
+    def add(self, item):
+        oldset.add(item)
+        return self
+
+    def clear(self):
+        oldset.clear(self)
+        return self
+
+    def update(self, iterable):
+        oldset.update(self, set(iterable))
+        return self
+
+    __iadd__ = __ior__ = update
