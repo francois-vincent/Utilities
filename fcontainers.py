@@ -87,10 +87,20 @@ class dict(olddict):
                 self.__delitem__(k)
         return self
 
+    def remove(self, elt):
+        self.__delitem__(elt)
+        return self
+
     def remove_all(self, iterable):
         for k in iterable:
             self.__delitem__(k)
         return self
+
+    def contains_all(self, iterable):
+        return all(i in self for i in iterable)
+
+    def contains_any(self, iterable):
+        return any(i in self for i in iterable)
 
     def project(self, iterable):
         for k in set(self) - set(iterable):
@@ -129,7 +139,10 @@ class dict(olddict):
         return self.update(other)
 
     __isub__ = discard_all
-    __iand__ = project
+    __iand__ = __imul__ = project
+    __or__ = __add__
+    __ior__ = __iadd__
+    __mul__ = __and__
 
 
 class list(oldlist):
@@ -175,11 +188,8 @@ class list(oldlist):
         return self
 
     def discard_all(self, iterable):
-        try:
-            for i in iterable:
-                oldlist.remove(self, i)
-        except ValueError:
-            pass
+        for i in iterable:
+            oldlist.discard(self, i)
         return self
 
     def reverse(self):
@@ -222,9 +232,11 @@ class set(oldset):
     def contains_all(self, iterable):
         return all(i in self for i in iterable)
 
-    __iadd__ = __ior__ = update
+    def contains_any(self, iterable):
+        return any(i in self for i in iterable)
 
     def __or__(self, iterable):
         return set(self).update(iterable)
 
     __add__ = __or__
+    __iadd__ = __ior__ = update
