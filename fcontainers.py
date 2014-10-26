@@ -2,7 +2,6 @@
 
 __all__ = ['dict', 'list', 'set', 'DuplicateValueError']
 
-
 olddict = dict
 oldlist = list
 oldset = set
@@ -14,6 +13,9 @@ class DuplicateValueError(ValueError):
 
 class ReverseDictFactory(object):
     from collections import defaultdict
+
+    class NoneObject(object):
+        pass
 
     class _count(object):
         def __init__(self):
@@ -31,10 +33,10 @@ class ReverseDictFactory(object):
 
     class _raise(object):
         def __init__(self):
-            self.value = None
+            self.value = ReverseDictFactory.NoneObject
         def add(self, k, v):
-            if self.value is not None:
-                raise DuplicateValueError("Duplicate value %s found for keys '%s' and '%s'" % (v, k, self.value))
+            if self.value is not ReverseDictFactory.NoneObject:
+                raise DuplicateValueError("Duplicate value '%s' found for keys '%s' and '%s'" % (v, k, self.value))
             self.value = k
         def val(self):
             return self.value
@@ -74,10 +76,20 @@ class dict(olddict):
         olddict.update(self, E, **F)
         return self
 
-    def remove(self, iterable):
+    def discard(self, elt):
+        if elt in self:
+            self.__delitem__(elt)
+        return self
+
+    def discard_all(self, iterable):
         for k in iterable:
             if k in self:
                 self.__delitem__(k)
+        return self
+
+    def remove_all(self, iterable):
+        for k in iterable:
+            self.__delitem__(k)
         return self
 
     def project(self, iterable):
@@ -85,15 +97,15 @@ class dict(olddict):
             self.__delitem__(k)
         return self
 
-    def reverse(self, duplicate='silent'):
+    def reverse(self, duplicate=None):
         """ reverse the dictionary (exchange keys and values)
             what's happening to duplicate values ?
-            if duplicate = 'silent' an arbitrary value among duplicates is chosen
-            if duplicate = 'raise', raise a DuplicateValueError exception
-            if duplicate = 'count', count number of keys (if duplicates, this number is >1)
+            if duplicate = None, an arbitrary value among duplicates is chosen (fastest)
+            if duplicate = 'raise', raise a detailed DuplicateValueError exception
+            if duplicate = 'count', count number of keys (for duplicates, this number is >1)
             if duplicate == 'list', append keys in a list
         """
-        if duplicate == 'silent':
+        if not duplicate:
             return dict((v, k) for k, v in self.iteritems())
         data = ReverseDictFactory.get_dict(duplicate)
         for k, v in self.iteritems():
@@ -106,17 +118,17 @@ class dict(olddict):
         return dict(self).update(other)
 
     def __sub__(self, other):
-        return dict(self).remove(other)
+        return dict(self).discard_all(other)
 
     def __and__(self, other):
-        return {k: self[k] for k in other}
+        return {k: self[k] for k in other if k in self}
 
     def __iadd__(self, other):
         if not issubclass(other.__class__, dict):
             other = dict.fromkeys(other)
         return self.update(other)
 
-    __isub__ = remove
+    __isub__ = discard_all
     __iand__ = project
 
 
@@ -125,6 +137,8 @@ class list(oldlist):
     Replacement class for list
     In place methods return 'self' instead of None
     - __add__: accepts any iterable, not only lists
+    - __sub__: accepts any iterable, not only lists
+    - __iadd__: does not need to be redefined, already accepts iterable !
     """
     list = oldlist
 
@@ -148,6 +162,26 @@ class list(oldlist):
         oldlist.remove(self, value)
         return self
 
+    def discard(self, value):
+        try:
+            oldlist.remove(self, value)
+        except ValueError:
+            pass
+        return self
+
+    def remove_all(self, iterable):
+        for i in iterable:
+            oldlist.remove(self, i)
+        return self
+
+    def discard_all(self, iterable):
+        try:
+            for i in iterable:
+                oldlist.remove(self, i)
+        except ValueError:
+            pass
+        return self
+
     def reverse(self):
         oldlist.reverse()
         return self
@@ -159,11 +193,17 @@ class list(oldlist):
     def __add__(self, iterable):
         return list(self).extend(iterable)
 
+    def __sub__(self, iterable):
+        return list(self).discard_all(iterable)
+
+    __isub__ = discard_all
+
 
 class set(oldset):
     """
     Replacement class for set
     In place methods return 'self' instead of None
+    - __iadd__: accepts any iterable, not only lists
     """
     set = oldset
 
@@ -179,4 +219,12 @@ class set(oldset):
         oldset.update(self, set(iterable))
         return self
 
+    def contains_all(self, iterable):
+        return all(i in self for i in iterable)
+
     __iadd__ = __ior__ = update
+
+    def __or__(self, iterable):
+        return set(self).update(iterable)
+
+    __add__ = __or__
