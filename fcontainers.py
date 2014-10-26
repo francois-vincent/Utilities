@@ -76,6 +76,13 @@ class dict(olddict):
         olddict.update(self, E, **F)
         return self
 
+    def update_difference(self, mapping):
+        for k, v in mapping.iteritems():
+            if k in self:
+                continue
+            self[k] = v
+        return self
+
     def discard(self, elt):
         if elt in self:
             self.__delitem__(elt)
@@ -122,8 +129,13 @@ class dict(olddict):
             data[v].add(k, v)
         return {k: v.val() for k, v in data.iteritems()}
 
+    def add_difference(self, other):
+        if not (issubclass(other.__class__, dict) or issubclass(dict, other.__class__)):
+            other = dict.fromkeys(other)
+        return dict(self).update_difference(other)
+
     def __add__(self, other):
-        if not issubclass(other.__class__, dict):
+        if not (issubclass(other.__class__, dict) or issubclass(dict, other.__class__)):
             other = dict.fromkeys(other)
         return dict(self).update(other)
 
@@ -131,10 +143,13 @@ class dict(olddict):
         return dict(self).discard_all(other)
 
     def __and__(self, other):
-        return {k: self[k] for k in other if k in self}
+        if len(other) > len(self) and hasattr(other, '__contains__'):
+            return {k: self[k] for k in self if k in other}
+        else:
+            return {k: self[k] for k in other if k in self}
 
     def __iadd__(self, other):
-        if not issubclass(other.__class__, dict):
+        if not (issubclass(other.__class__, dict) or issubclass(dict, other.__class__)):
             other = dict.fromkeys(other)
         return self.update(other)
 

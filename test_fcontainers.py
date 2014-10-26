@@ -19,10 +19,12 @@ class DictTestCase(unittest.TestCase):
         self.assertDictEqual(d.clear(), {})
 
     def test_update(self):
-        d = self.d
+        d = dict(self.d)
         self.assertDictEqual(dict().update(d), d)
         self.assertDictEqual(dict().update(**d), d)
         self.assertDictEqual(dict().update(d, **d), d)
+        self.assertDictEqual(d.update(e=5), self.d + {'e': 5})
+        self.assertDictEqual(d, self.d + {'e': 5})
 
     def test_discard(self):
         d = self.d
@@ -93,6 +95,17 @@ class DictTestCase(unittest.TestCase):
         d = dict(self.d)
         self.assertDictEqual(d + 'ae', {'a': None, 'b': 2, 'c': 3, 'd': 4, 'e': None})
         self.assertDictEqual(d, self.d)
+        d = dict(self.d)
+        self.assertDictEqual(d + {'a': 9, 'e': 8}, {'a': 9, 'b': 2, 'c': 3, 'd': 4, 'e': 8})
+        self.assertDictEqual(d, self.d)
+        d = dict(self.d)
+        self.assertDictEqual(d + dict(a=9, e=8), {'a': 9, 'b': 2, 'c': 3, 'd': 4, 'e': 8})
+        self.assertDictEqual(d, self.d)
+
+    def test_add_difference(self):
+        d = dict(self.d)
+        self.assertDictEqual(d.add_difference('ae'), {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': None})
+        self.assertDictEqual(d, self.d)
 
     def test_sub(self):
         d = dict(self.d)
@@ -107,9 +120,15 @@ class DictTestCase(unittest.TestCase):
         self.assertDictEqual(d & 'ef', {})
 
     def test_iadd(self):
-        d = self.d
+        d = dict(self.d)
         d += 'ae'
         self.assertDictEqual(d, {'a': None, 'b': 2, 'c': 3, 'd': 4, 'e': None})
+        d = dict(self.d)
+        d += {'a': 9, 'e': 8}
+        self.assertDictEqual(d, {'a': 9, 'b': 2, 'c': 3, 'd': 4, 'e': 8})
+        d = dict(self.d)
+        d += dict(a=9, e=8)
+        self.assertDictEqual(d, {'a': 9, 'b': 2, 'c': 3, 'd': 4, 'e': 8})
 
     def test_isub(self):
         d = self.d
