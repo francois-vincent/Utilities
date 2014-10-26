@@ -130,12 +130,12 @@ class dict(olddict):
         return {k: v.val() for k, v in data.iteritems()}
 
     def add_difference(self, other):
-        if not (issubclass(other.__class__, dict) or issubclass(dict, other.__class__)):
+        if not issubclass(other.__class__, dict.dict):
             other = dict.fromkeys(other)
         return dict(self).update_difference(other)
 
     def __add__(self, other):
-        if not (issubclass(other.__class__, dict) or issubclass(dict, other.__class__)):
+        if not issubclass(other.__class__, dict.dict):
             other = dict.fromkeys(other)
         return dict(self).update(other)
 
@@ -143,13 +143,13 @@ class dict(olddict):
         return dict(self).discard_all(other)
 
     def __and__(self, other):
-        if len(other) > len(self) and hasattr(other, '__contains__'):
-            return {k: self[k] for k in self if k in other}
+        if len(other) > len(self) and issubclass(other.__class__, dict.dict):
+            return {k: v for k, v in self.iteritems() if k in other}
         else:
             return {k: self[k] for k in other if k in self}
 
     def __iadd__(self, other):
-        if not (issubclass(other.__class__, dict) or issubclass(dict, other.__class__)):
+        if not issubclass(other.__class__, dict.dict):
             other = dict.fromkeys(other)
         return self.update(other)
 
@@ -170,8 +170,12 @@ class list(oldlist):
     """
     list = oldlist
 
+    def clear(self):
+        for x in xrange(len(self)):
+            del self[-1]
+
     def append(self, x):
-        oldlist.append(x)
+        oldlist.append(self, x)
         return self
 
     def extend(self, iterable):
@@ -204,7 +208,7 @@ class list(oldlist):
 
     def discard_all(self, iterable):
         for i in iterable:
-            oldlist.discard(self, i)
+            self.discard(i)
         return self
 
     def reverse(self):

@@ -135,12 +135,64 @@ class DictTestCase(unittest.TestCase):
         d -= 'ad'
         self.assertDictEqual(d, dict(b=2, c=3))
 
+    def test_imul_iand(self):
+        d = self.d
+        d *= 'bc'
+        self.assertDictEqual(d, dict(b=2, c=3))
+        d &= 'xy'
+        self.assertDictEqual(d, {})
+
 
 class ListTestCase(unittest.TestCase):
 
     def test_constructor(self):
         self.assertListEqual(list('abcd'), ['a', 'b', 'c', 'd'])
         self.assertListEqual(list(list('abcd')), ['a', 'b', 'c', 'd'])
+
+    def test_append_extend(self):
+        l = list('ab')
+        self.assertListEqual(l.append('c').extend('de'), ['a', 'b', 'c', 'd', 'e'])
+        self.assertListEqual(l, ['a', 'b', 'c', 'd', 'e'])
+
+    def test_insert(self):
+        l = list('ab')
+        self.assertListEqual(l.insert(0, 'x'), ['x', 'a', 'b'])
+        self.assertListEqual(l.insert(-1, 'y'), ['x', 'a', 'b', 'y'])
+
+    def test_remove(self):
+        l = list('abc')
+        self.assertListEqual(l.remove('a'), ['b', 'c'])
+        self.assertRaises(ValueError, l.remove, 'a')
+
+    def test_remove_all(self):
+        l = list('abc')
+        self.assertListEqual(l.remove_all('ac'), ['b'])
+        self.assertRaises(ValueError, l.remove_all, 'bc')
+
+    def test_discard(self):
+        l = list('abc')
+        self.assertListEqual(l.discard('a'), ['b', 'c'])
+        self.assertListEqual(l.discard('a'), ['b', 'c'])
+
+    def test_add(self):
+        self.assertListEqual(list('ab') + 'cd', ['a', 'b', 'c', 'd'])
+
+    def test_iadd(self):
+        l = list('ab')
+        l += 'cd'
+        self.assertListEqual(l, ['a', 'b', 'c', 'd'])
+
+    def test_sub(self):
+        self.assertListEqual(list('abcd') - 'cd', ['a', 'b'])
+        self.assertListEqual(list('abcd') - 'cx', ['a', 'b', 'd'])
+
+    def test_isub(self):
+        l = list('abcd')
+        l -= 'cd'
+        self.assertListEqual(l, ['a', 'b'])
+        l = list('abcd')
+        l -= 'cx'
+        self.assertListEqual(l, ['a', 'b', 'd'])
 
 
 class SetTestCase(unittest.TestCase):
