@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+# TODO
+# dict: est-il pertinent d'avoir une autre valeur par défaut pour dict.fromkeys
+
 __all__ = ['dict', 'list', 'set', 'DuplicateValueError']
 
 olddict = dict

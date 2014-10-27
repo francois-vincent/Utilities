@@ -5,6 +5,7 @@
 # add a date type with tz in Config
 # revoir la stratégie de recherche de parser
 # cls.default_parser peut être 'guess'
+# add some logging
 
 import copy
 import functools
@@ -36,11 +37,11 @@ except ImportError:
 
 
 # predefined parser functions
-# a parser function accepts a config file full path as unique parameter and returns a Config instance
+# a parser function accepts a config file full path as unique parameter and returns a dict
 
 def json_parser(file):
     with open(file, 'r') as f:
-        return Config(json.load(f))
+        return json.load(f)
 
 
 def ini_parser(file):
@@ -48,23 +49,27 @@ def ini_parser(file):
     cp = ConfigParser.RawConfigParser(dict_type=dict)
     with open(file, 'r') as f:
         cp._read(f, file)
-    # remove some stuff
+        # remove some stuff
     for s in cp._sections.itervalues():
         del s['__name__']
-    return Config(cp._sections)
+    return cp._sections
 
 
 def yaml_parser(file):
     with open(file, 'r') as f:
-        return Config(yaml.safe_load(f))
+        return yaml.safe_load(f)
 
 
 def xml_parser(file):
     with open(file, 'r') as f:
-        return Config(xmltodict.parse(f.read()))
+        return xmltodict.parse(f.read())
 
 
 class ConfigurationError(RuntimeError):
+    pass
+
+
+class ConfigurationParserError(ConfigurationError):
     pass
 
 
@@ -133,21 +138,27 @@ class Config(dict):
                 ...
         """
         this = self
+
         class ContextDecorator(object):
             def __init__(self, **kwargs):
                 self.overrides = kwargs
+
             def __enter__(self):
                 self.copy = this._deepcopy()
                 return this._update(self.overrides)
+
             def __exit__(self, *args):
                 this.clear()
                 this.update(self.copy)
+
             def __call__(self, f):
                 @functools.wraps(f)
                 def decorated(*args, **kwds):
                     with self:
                         return f(*args, **kwds)
+
                 return decorated
+
         return ContextDecorator(**kwargs)
 
     def __getitem__(self, key):
@@ -200,6 +211,7 @@ class Config(dict):
             return int(v)
         except TypeError:
             return self._default_or_raises(k, 'integer', d)
+
     get_int = get_integer
 
     def get_float(self, k, d=0.0):
@@ -223,6 +235,7 @@ class Config(dict):
             return self._boolean_states[v.lower()]
         except (KeyError, AttributeError):
             return self._default_or_raises(k, 'boolean', d)
+
     get_bool = get_boolean
 
     def get_list(self, k, d=None):
@@ -245,20 +258,7 @@ class Config(dict):
         pass
 
 
-class CachedConfigReader(object):
-    # Fixme
-    """
-    Implements configuration reading with features:
-    - configurable parser. By order of priority:
-      1- explicitly specified in read_config(),
-      2- use file extension,
-      3- specified in first comment line of config file,
-      4- class default parser
-    - two levels instance caching:
-      CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory,
-      (one directory == one instance).
-      cr.read_config(config_file) reads and cache the specified config file as a mapping object.
-    """
+class ParserResolver(object):
     parsers_dict = dict(
         ini=ini_parser,
         yaml=yaml_parser,
@@ -273,14 +273,7 @@ class CachedConfigReader(object):
         json='json',
         xml='xml',
     )
-    dir_cache = {}
-    check_dir = True
-    default_parser = staticmethod(ini_parser)
     parser_resolution_order = ['ini', 'json', 'yaml', 'xml']
-
-    def __init__(self, config_dir):
-        self.config_dir = config_dir
-        self.cache = {}
 
     @classmethod
     def add_parser(cls, name, parser, aliases=(), index=0):
@@ -288,7 +281,7 @@ class CachedConfigReader(object):
         for a in aliases:
             cls.parsers_aliases[a] = name
         if index < 0:
-            # poor insert() negative index management... it cannot append !
+            # poor list.insert() negative index management... it cannot append !
             if index == -1:
                 return cls.parser_resolution_order.append(name)
             else:
@@ -296,24 +289,20 @@ class CachedConfigReader(object):
         cls.parser_resolution_order.insert(index, name)
 
     @classmethod
-    def set_default_parser(cls, parser):
-        cls.default_parser = staticmethod(cls.get_parser(parser))
-
-    @classmethod
-    def get_instance(cls, config_dir):
-        path = os.path.abspath(config_dir)
-        if path not in cls.dir_cache:
-            if cls.check_dir:
-                if not os.access(path, os.R_OK):
-                    raise IOError("%s: read access forbidden or folder missing" % path)
-            cls.dir_cache[path] = CachedConfigReader(path)
-        return cls.dir_cache[path]
-
-    @classmethod
     def get_parser_from_string(cls, parser):
         return cls.parsers_dict[cls.parsers_aliases[parser]]
 
-    def toto(self, path, parser):
+    @classmethod
+    def read_config_from_file(cls, parser, path):
+        try:
+            return Config(parser(path))
+        except IOError:
+            raise
+        except Exception:
+            pass
+
+    @classmethod
+    def get_parser_from_file(cls, parser, path):
         """
         méthode de recherche du parser :
         si parser.startswith('guess')
@@ -328,22 +317,94 @@ class CachedConfigReader(object):
         si échec
           raise ConfigurationFileError
         """
-
-    def get_parser_from_file(self, path):
-        parser = self.default_parser
         try:
-            # try to get parser from file extension
-            parser = self.get_parser_from_string(path.rsplit('.', 1)[1])
+            # try to guess parser from file extension
+            parser = cls.get_parser_from_string(path.rsplit('.', 1)[1])
         except (KeyError, IndexError):
-            # else try to guess parser from first comment line
+            config = None
+        else:
+            config = cls.read_config_from_file(parser, path)
+        if config is None:
+            # try to guess parser from first line comment
             with open(path, 'r') as f:
                 first_line = f.readline().lower()
             if first_line[0] in ('#', ';'):
-                for k, v in self.parsers_dict.iteritems():
+                for k, v in cls.parsers_aliases.iteritems():
                     if k in first_line:
-                        parser = v
+                        parser = cls.parsers_dict[v]
+                        config = cls.read_config_from_file(parser, path)
                         break
-        return parser
+        if config is None and parser == 'guess_hard':
+            # try each parser in order
+            for p in cls.parser_resolution_order:
+                try:
+                    parser = cls.parsers_dict[p]
+                    config = cls.read_config_from_file(parser, path)
+                except Exception:
+                    pass
+        if config is None:
+            raise ConfigurationParserError("No parser found for file %s" % path)
+        return config
+
+    @classmethod
+    def get_config(cls, parser, path):
+        if isinstance(parser, basestring):
+            if parser.startswith('guess'):
+                try:
+                    return cls.get_parser_from_file(parser, path)
+                except IOError:
+                    raise ConfigurationFileError("Could not read file %s" % path)
+            else:
+                try:
+                    parser = cls.get_parser_from_string(parser)
+                except KeyError:
+                    raise ConfigurationParserError("Parser %s not found" % parser)
+        try:
+            config = cls.read_config_from_file(parser, path)
+        except IOError:
+            raise ConfigurationFileError("Could not read file %s" % path)
+        if config is None:
+            raise ConfigurationParserError(
+                "Could not read configuration file %s with parser %s", (path, parser.__name__))
+
+
+class CachedConfigReader(object):
+    # Fixme
+    """
+    Implements configuration reading with features:
+    - configurable parser. By order of priority:
+      1- explicitly specified in read_config(),
+      2- use file extension,
+      3- specified in first comment line of config file,
+      4- class default parser
+    - two levels instance caching:
+      CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory,
+      (one directory == one instance).
+      cr.read_config(config_file) reads and cache the specified config file as a mapping object.
+    """
+    dir_cache = {}
+    check_dir = True
+    default_parser = 'guess'
+
+    def __init__(self, config_dir):
+        self.config_dir = config_dir
+        self.cache = {}
+
+    add_parser = ParserResolver.add_parser
+
+    @classmethod
+    def set_default_parser(cls, parser):
+        cls.default_parser = parser
+
+    @classmethod
+    def get_instance(cls, config_dir):
+        path = os.path.abspath(config_dir)
+        if path not in cls.dir_cache:
+            if cls.check_dir:
+                if not os.access(path, os.R_OK):
+                    raise IOError("%s: read access forbidden or folder missing" % path)
+            cls.dir_cache[path] = CachedConfigReader(path)
+        return cls.dir_cache[path]
 
     @classmethod
     def get_parser(cls, parser):
@@ -384,6 +445,7 @@ class CachedConfigReader(object):
                 parser = Config(default)
             self.instanciate_config(config_name, parser)
         return self.cache[config_name]
+
     get_config = read_config
 
     def reload(self, config=None):
@@ -391,4 +453,5 @@ class CachedConfigReader(object):
             del self.cache[config]
         else:
             self.cache = {}
+
     reset = clean = clear = reload
