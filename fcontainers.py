@@ -2,6 +2,8 @@
 
 # TODO
 # dict: est-il pertinent d'avoir une autre valeur par défaut pour dict.fromkeys
+# conatains_any doit retourner la clef
+# methode any_in() pour dict, list et set, other = container
 
 __all__ = ['dict', 'list', 'set', 'DuplicateValueError']
 
@@ -109,8 +111,17 @@ class dict(olddict):
     def contains_all(self, iterable):
         return all(i in self for i in iterable)
 
+    def all_in(self, iterable):
+        return all(i in iterable for i in self)
+
     def contains_any(self, iterable):
         return any(i in self for i in iterable)
+
+    def any_in(self, iterable):
+        return any(i in iterable for i in self)
+
+    def search(self, text):
+        return {k: v for k, v in self.iteritems() if text in k}
 
     def project(self, iterable):
         for k in set(self) - set(iterable):
@@ -222,6 +233,9 @@ class list(oldlist):
         oldlist.sort(self, **p)
         return self
 
+    def search(self, text):
+        return [x for x in self if text in x]
+
     def __add__(self, iterable):
         return list(self).extend(iterable)
 
@@ -256,6 +270,9 @@ class set(oldset):
 
     def contains_any(self, iterable):
         return any(i in self for i in iterable)
+
+    def search(self, text):
+        set(x for x in self if text in x)
 
     def __or__(self, iterable):
         return set(self).update(iterable)
