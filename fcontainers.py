@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+__version__ = '0.0.1'
 
 # TODO
-# dict: est-il pertinent d'avoir une autre valeur par défaut pour dict.fromkeys
 # conatains_any doit retourner la clef
-# methode any_in() pour dict, list et set, other = container
+# tester différentes implémentations (speed) ex: set.contains_all iterator vs set arithmetic
+# éventuellement mettre 2 implémentations avec un test (dict.__and__)
 
 __all__ = ['dict', 'list', 'set', 'DuplicateValueError']
 
@@ -72,6 +73,7 @@ class dict(olddict):
     - __iand__: operator version of project
     """
     dict = olddict
+    __default_value__ = None
 
     def clear(self):
         olddict.clear(self)
@@ -82,6 +84,8 @@ class dict(olddict):
         return self
 
     def update_difference(self, mapping):
+        """ Like update except that only new keys will be updated
+        """
         for k, v in mapping.iteritems():
             if k in self:
                 continue
@@ -89,41 +93,63 @@ class dict(olddict):
         return self
 
     def discard(self, elt):
+        """ Like delete except it does not raise KeyError exception
+        """
         if elt in self:
             self.__delitem__(elt)
         return self
 
     def discard_all(self, iterable):
+        """ Iterable version of discard
+        """
         for k in iterable:
             if k in self:
                 self.__delitem__(k)
         return self
 
     def remove(self, elt):
+        """ Alias of delete that returns self
+        """
         self.__delitem__(elt)
         return self
 
     def remove_all(self, iterable):
+        """ iterable version of remove
+        """
         for k in iterable:
             self.__delitem__(k)
         return self
 
     def contains_all(self, iterable):
+        """ True if every element of iterable is aalso a key of self
+        """
         return all(i in self for i in iterable)
 
-    def all_in(self, iterable):
-        return all(i in iterable for i in self)
-
     def contains_any(self, iterable):
+        """ True if any element of iterable is aalso a key of self
+        """
         return any(i in self for i in iterable)
 
-    def any_in(self, iterable):
-        return any(i in iterable for i in self)
+    def all_in(self, container):
+        """ True if all keys of self is also in container
+            use preferably if container.__contains__() evaluates in constant time
+        """
+        return all(i in container for i in self)
+
+    def any_in(self, container):
+        """ True if any key of self is also in container
+            use preferably if container.__contains__() evaluates in constant time
+        """
+        return any(i in container for i in self)
 
     def search(self, text):
+        """ Returns a copy of self filtered on keys that contain the search text
+        """
         return {k: v for k, v in self.iteritems() if text in k}
 
     def project(self, iterable):
+        """ Removes every key of self that is not in iterable
+        """
         for k in set(self) - set(iterable):
             self.__delitem__(k)
         return self
@@ -144,27 +170,37 @@ class dict(olddict):
         return {k: v.val() for k, v in data.iteritems()}
 
     def add_difference(self, other):
+        """ Immutable version of update_difference, with additional feature that it can add any iterable
+        """
         if not issubclass(other.__class__, dict.dict):
-            other = dict.fromkeys(other)
+            other = dict.fromkeys(other, dict.__default_value__)
         return dict(self).update_difference(other)
 
     def __add__(self, other):
+        """ Immutable version of update, with additional feature that it can add any iterable
+        """
         if not issubclass(other.__class__, dict.dict):
-            other = dict.fromkeys(other)
+            other = dict.fromkeys(other, dict.__default_value__)
         return dict(self).update(other)
 
     def __sub__(self, other):
+        """ Immutable version of discard_all
+        """
         return dict(self).discard_all(other)
 
     def __and__(self, other):
+        """ Immutable version of project
+        """
         if len(other) > len(self) and issubclass(other.__class__, dict.dict):
             return {k: v for k, v in self.iteritems() if k in other}
         else:
             return {k: self[k] for k in other if k in self}
 
     def __iadd__(self, other):
+        """ Like update, except that it can add any iterable
+        """
         if not issubclass(other.__class__, dict.dict):
-            other = dict.fromkeys(other)
+            other = dict.fromkeys(other, dict.__default_value__)
         return self.update(other)
 
     __isub__ = discard_all

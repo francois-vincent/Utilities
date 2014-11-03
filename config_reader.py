@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
+__version__ = '0.0.1'
 
 # TODO
-# guess parser from file (try every parser in sequence), order is configurable
 # add a date type with tz in Config
-# revoir la stratégie de recherche de parser
-# cls.default_parser peut être 'guess'
 # add some logging
 
 import copy
@@ -255,6 +253,8 @@ class Config(dict):
         return self._default_or_raises(k, 'list', d)
 
     def get_date(self, k, d=None):
+        """ leaf date acces operator, reads an ISO formated naive or tzed date
+        """
         pass
 
 
@@ -288,12 +288,9 @@ class ParserResolver(object):
                 index += 1
         cls.parser_resolution_order.insert(index, name)
 
-    @classmethod
-    def get_parser_from_string(cls, parser):
-        return cls.parsers_dict[cls.parsers_aliases[parser]]
-
-    @classmethod
-    def read_config_from_file(cls, parser, path):
+    def read_config_from_file(self, parser, path):
+        if isinstance(parser, basestring):
+            parser = self.parsers_dict[parser]
         try:
             return Config(parser(path))
         except IOError:
@@ -301,10 +298,49 @@ class ParserResolver(object):
         except Exception:
             pass
 
-    @classmethod
-    def get_parser_from_file(cls, parser, path):
+    def get_config_from_file(self, parser, path):
+        self.parser_resolution_order = list(self.parser_resolution_order)
+        try:
+            # try to guess parser from file extension
+            parser = self.parsers_aliases[path.rsplit('.', 1)[1]]
+        except (KeyError, IndexError):
+            config = None
+        else:
+            self.parser_resolution_order.remove(parser)
+            config = self.read_config_from_file(parser, path)
+        if config is None:
+            # try to guess parser from first line comment
+            with open(path, 'r') as f:
+                first_line = f.readline().lower()
+            if first_line[0] in ('#', ';'):
+                for k, v in self.parsers_aliases.iteritems():
+                    if k in first_line and v in self.parser_resolution_order:
+                        self.parser_resolution_order.remove(v)
+                        config = self.read_config_from_file(v, path)
+                        break
+        if config is None and parser == 'guess_hard':
+            # try each remaning parser in order
+            for p in self.parser_resolution_order:
+                try:
+                    config = self.read_config_from_file(p, path)
+                except Exception:
+                    pass
+        if config is None:
+            raise ConfigurationFileError("No parser found for file %s" % path)
+        return config
+
+    def get_config(self, parser, path):
         """
         méthode de recherche du parser :
+        si parser est uclsne fonction:
+          lire la config
+        si échec
+          raise ConfigurationFileError
+        si parser est une chaine
+          si dans le dico, lire la config,
+          si décodage avec le parser échoue, c'est pas 'guess' donc ConfigurationFileError
+        si pas dans le dico et pas 'guess'
+          raise ConfigurationParserError
         si parser.startswith('guess')
           si extension pas dans la liste, échec
           si décodage avec extension échoue, échec
@@ -317,54 +353,23 @@ class ParserResolver(object):
         si échec
           raise ConfigurationFileError
         """
-        try:
-            # try to guess parser from file extension
-            parser = cls.get_parser_from_string(path.rsplit('.', 1)[1])
-        except (KeyError, IndexError):
-            config = None
-        else:
-            config = cls.read_config_from_file(parser, path)
-        if config is None:
-            # try to guess parser from first line comment
-            with open(path, 'r') as f:
-                first_line = f.readline().lower()
-            if first_line[0] in ('#', ';'):
-                for k, v in cls.parsers_aliases.iteritems():
-                    if k in first_line:
-                        parser = cls.parsers_dict[v]
-                        config = cls.read_config_from_file(parser, path)
-                        break
-        if config is None and parser == 'guess_hard':
-            # try each parser in order
-            for p in cls.parser_resolution_order:
-                try:
-                    parser = cls.parsers_dict[p]
-                    config = cls.read_config_from_file(parser, path)
-                except Exception:
-                    pass
-        if config is None:
-            raise ConfigurationParserError("No parser found for file %s" % path)
-        return config
-
-    @classmethod
-    def get_config(cls, parser, path):
         if isinstance(parser, basestring):
             if parser.startswith('guess'):
                 try:
-                    return cls.get_parser_from_file(parser, path)
+                    return self.get_config_from_file(parser, path)
                 except IOError:
                     raise ConfigurationFileError("Could not read file %s" % path)
             else:
                 try:
-                    parser = cls.get_parser_from_string(parser)
+                    parser = self.parsers_aliases[parser]
                 except KeyError:
                     raise ConfigurationParserError("Parser %s not found" % parser)
         try:
-            config = cls.read_config_from_file(parser, path)
+            config = self.read_config_from_file(parser, path)
         except IOError:
             raise ConfigurationFileError("Could not read file %s" % path)
         if config is None:
-            raise ConfigurationParserError(
+            raise ConfigurationFileError(
                 "Could not read configuration file %s with parser %s", (path, parser.__name__))
 
 
@@ -380,70 +385,57 @@ class CachedConfigReader(object):
     - two levels instance caching:
       CachedConfigReader.get_instance(dir) returns a config reader instance for the specified directory,
       (one directory == one instance).
-      cr.read_config(config_file) reads and cache the specified config file as a mapping object.
+      cr.read_config(config_file) reads and cache the specified config file as a Config object.
     """
     dir_cache = {}
-    check_dir = True
     default_parser = 'guess'
+    default_config = None
 
-    def __init__(self, config_dir):
+    def __init__(self, config_dir, parser, default):
         self.config_dir = config_dir
+        self.default_parser, self.default_config = parser, default
         self.cache = {}
 
     add_parser = ParserResolver.add_parser
 
+    @staticmethod
+    def first_not_none(*args):
+        for arg in args:
+            if arg is not None:
+                return arg
+
     @classmethod
     def set_default_parser(cls, parser):
         cls.default_parser = parser
+        return cls
 
     @classmethod
-    def get_instance(cls, config_dir):
+    def get_instance(cls, config_dir, parser=None, default=None):
         path = os.path.abspath(config_dir)
         if path not in cls.dir_cache:
-            if cls.check_dir:
+            if CachedConfigReader.first_not_none(default, cls.default_config) is None:
                 if not os.access(path, os.R_OK):
-                    raise IOError("%s: read access forbidden or folder missing" % path)
-            cls.dir_cache[path] = CachedConfigReader(path)
+                    raise IOError("%s: folder missing or read access forbidden" % path)
+            cls.dir_cache[path] = CachedConfigReader(path, parser, default)
         return cls.dir_cache[path]
 
-    @classmethod
-    def get_parser(cls, parser):
-        """this method accepts None, a parser function or a string
-        """
-        if parser is None:
-            return cls.default_parser
-        if isinstance(parser, basestring):
-            try:
-                return cls.get_parser_from_string(parser)
-            except KeyError:
-                pass
-        return parser
-
-    def instanciate_config(self, name, config):
-        self.cache[name] = config
-
-    def read_config(self, config_name, parser=None, default={}):
+    def read_config(self, config_name, parser=None, default=None):
         """ reads and parse the config file, or get the cached configuration if available.
-            you can specify default='__raise__' to raise an exception on missing file or wrong parser
+            you can specify default=dict(...) to return a default config on missing file or wrong parser
         """
         if config_name not in self.cache:
             path = os.path.join(self.config_dir, config_name)
             try:
-                parser = self.get_parser(parser)
-                if isinstance(parser, basestring):
-                    parser = self.get_parser_from_file(path)
+                parser = parser or self.default_parser or self.__class__.default_parser
                 if parser is None:
-                    raise ConfigurationFileError("No parser found for file: %s" % path)
-                parser = parser(path)
-            except IOError:
-                if default == '__raise__':
-                    raise ConfigurationFileError("Configuration file not found: %s" % path)
-                parser = Config(default)
-            except Exception as e:
-                if default == '__raise__':
-                    raise ConfigurationFileError("Parser error in file %s: %s" % (path, e))
-                parser = Config(default)
-            self.instanciate_config(config_name, parser)
+                    raise ConfigurationFileError("No parser specified for file: %s" % path)
+                config = ParserResolver().get_config(parser, path)
+            except Exception:
+                default = CachedConfigReader.first_not_none(default, self.default_config, self.__class__.default_config)
+                if default is None:
+                    raise
+                config = Config(default)
+            self.cache[config_name] = config
         return self.cache[config_name]
 
     get_config = read_config
@@ -453,5 +445,6 @@ class CachedConfigReader(object):
             del self.cache[config]
         else:
             self.cache = {}
+        return self
 
     reset = clean = clear = reload
