@@ -194,6 +194,12 @@ class ListTestCase(unittest.TestCase):
         l -= 'cx'
         self.assertListEqual(l, ['a', 'b', 'd'])
 
+    def test_all_none(self):
+        l1 = list((None, None, None))
+        l2 = list((None, None, False))
+        self.assertEqual(l1.all_none(), True)
+        self.assertEqual(l2.all_none(), False)
+
 
 class SetTestCase(unittest.TestCase):
 

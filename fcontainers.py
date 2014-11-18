@@ -2,11 +2,15 @@
 __version__ = '0.0.1'
 
 # TODO
-# conatains_any doit retourner la clef
+# draw a clear line between mutable and immutable methods
 # tester différentes implémentations (speed) ex: set.contains_all iterator vs set arithmetic
 # éventuellement mettre 2 implémentations avec un test (dict.__and__)
+# design a purely immutable dict class with history stored in deque
+# voir lodash.js pour d'autres idées
 
 __all__ = ['dict', 'list', 'set', 'DuplicateValueError']
+
+from collections import defaultdict, deque
 
 olddict = dict
 oldlist = list
@@ -18,7 +22,9 @@ class DuplicateValueError(ValueError):
 
 
 class ReverseDictFactory(object):
-    from collections import defaultdict
+    """
+    Helper class for dict.reverse()
+    """
 
     class NoneObject(object):
         pass
@@ -49,7 +55,7 @@ class ReverseDictFactory(object):
 
     @classmethod
     def get_dict(cls, case):
-        return cls.defaultdict({
+        return defaultdict({
             'raise': cls._raise,
             'count': cls._count,
             'list': cls._list,
@@ -75,11 +81,15 @@ class dict(olddict):
     dict = olddict
     __default_value__ = None
 
+    # mutable methods (return self)
+
     def clear(self):
         olddict.clear(self)
         return self
 
     def update(self, E={}, **F):
+        """ Update replacement that retuurns sel
+        """
         olddict.update(self, E, **F)
         return self
 
@@ -120,6 +130,93 @@ class dict(olddict):
             self.__delitem__(k)
         return self
 
+    def project(self, iterable):
+        """ Removes every key of self that is not in iterable
+        """
+        for k in set(self) - set(iterable):
+            self.__delitem__(k)
+        return self
+
+    def __iadd__(self, other):
+        """ Like update, except that it can add any iterable
+        """
+        if not isinstance(other, olddict):
+            other = dict.fromkeys(other, dict.__default_value__)
+        return self.update(other)
+
+    __ior__ = __iadd__
+    __isub__ = discard_all
+    __iand__ = __imul__ = project
+
+    # immutable methods (return a copy)
+
+    def filter_key(self, f=bool):
+        """ Returns a copy of self filtered on keys that satisfy f
+        """
+        return {k: v for k, v in self.iteritems() if f(k)}
+
+    def filter_value(self, f=bool):
+        """ Returns a copy of self filtered on values that satisfy f
+        """
+        return {k: v for k, v in self.iteritems() if f(v)}
+
+    def filter(self, f=tuple):
+        """ Returns a copy of self filtered by f(key, value)
+        """
+        return {k: v for k, v in self.iteritems() if f(k, v)}
+
+    def search(self, text):
+        """ Returns a copy of self filtered on keys that contain the search text
+        """
+        return {k: v for k, v in self.iteritems() if text in k}
+
+    def reverse(self, duplicate=None):
+        """ reverse the dictionary (exchange keys and values)
+            what's happening to duplicate values ?
+            if duplicate == None, an arbitrary value among duplicates is chosen (fastest)
+            if duplicate == 'raise', raise a detailed DuplicateValueError exception
+            if duplicate == 'count', count number of keys (for duplicates, this number is >1)
+            if duplicate == 'list', append keys in a list
+        """
+        if not duplicate:
+            return {v: k for k, v in self.iteritems()}
+        data = ReverseDictFactory.get_dict(duplicate)
+        for k, v in self.iteritems():
+            data[v].add(k, v)
+        return {k: v.val() for k, v in data.iteritems()}
+
+    def add_difference(self, other):
+        """ Immutable version of update_difference, that can add any iterable
+        """
+        if not isinstance(other, olddict):
+            other = dict.fromkeys(other, dict.__default_value__)
+        return dict(self).update_difference(other)
+
+    def __add__(self, other):
+        """ Immutable version of update, that can add any iterable
+        """
+        if not isinstance(other, olddict):
+            other = dict.fromkeys(other, dict.__default_value__)
+        return dict(self).update(other)
+
+    def __sub__(self, other):
+        """ Immutable version of discard_all
+        """
+        return dict(self).discard_all(other)
+
+    def __and__(self, other):
+        """ Immutable version of project, with optimization based on the relative size
+        """
+        if len(other) > len(self) and isinstance(other, olddict):
+            return {k: v for k, v in self.iteritems() if k in other}
+        else:
+            return {k: self[k] for k in other if k in self}
+
+    __or__ = __add__
+    __mul__ = __and__
+
+    # helper methods (return a value)
+
     def contains_all(self, iterable):
         """ True if every element of iterable is aalso a key of self
         """
@@ -142,77 +239,12 @@ class dict(olddict):
         """
         return any(i in container for i in self)
 
-    def search(self, text):
-        """ Returns a copy of self filtered on keys that contain the search text
-        """
-        return {k: v for k, v in self.iteritems() if text in k}
-
-    def project(self, iterable):
-        """ Removes every key of self that is not in iterable
-        """
-        for k in set(self) - set(iterable):
-            self.__delitem__(k)
-        return self
-
-    def reverse(self, duplicate=None):
-        """ reverse the dictionary (exchange keys and values)
-            what's happening to duplicate values ?
-            if duplicate = None, an arbitrary value among duplicates is chosen (fastest)
-            if duplicate = 'raise', raise a detailed DuplicateValueError exception
-            if duplicate = 'count', count number of keys (for duplicates, this number is >1)
-            if duplicate == 'list', append keys in a list
-        """
-        if not duplicate:
-            return dict((v, k) for k, v in self.iteritems())
-        data = ReverseDictFactory.get_dict(duplicate)
-        for k, v in self.iteritems():
-            data[v].add(k, v)
-        return {k: v.val() for k, v in data.iteritems()}
-
-    def add_difference(self, other):
-        """ Immutable version of update_difference, with additional feature that it can add any iterable
-        """
-        if not issubclass(other.__class__, dict.dict):
-            other = dict.fromkeys(other, dict.__default_value__)
-        return dict(self).update_difference(other)
-
-    def __add__(self, other):
-        """ Immutable version of update, with additional feature that it can add any iterable
-        """
-        if not issubclass(other.__class__, dict.dict):
-            other = dict.fromkeys(other, dict.__default_value__)
-        return dict(self).update(other)
-
-    def __sub__(self, other):
-        """ Immutable version of discard_all
-        """
-        return dict(self).discard_all(other)
-
-    def __and__(self, other):
-        """ Immutable version of project
-        """
-        if len(other) > len(self) and issubclass(other.__class__, dict.dict):
-            return {k: v for k, v in self.iteritems() if k in other}
-        else:
-            return {k: self[k] for k in other if k in self}
-
-    def __iadd__(self, other):
-        """ Like update, except that it can add any iterable
-        """
-        if not issubclass(other.__class__, dict.dict):
-            other = dict.fromkeys(other, dict.__default_value__)
-        return self.update(other)
-
-    __isub__ = discard_all
-    __iand__ = __imul__ = project
-    __or__ = __add__
-    __ior__ = __iadd__
-    __mul__ = __and__
-
 
 class list(oldlist):
+    # Fixme: sort methods by type
     """
     Replacement class for list
+    defines new methods that are both static and instance methods
     In place methods return 'self' instead of None
     - __add__: accepts any iterable, not only lists
     - __sub__: accepts any iterable, not only lists
@@ -220,9 +252,37 @@ class list(oldlist):
     """
     list = oldlist
 
+    def all_none(self):
+        return all(x is None for x in self)
+
+    def any_none(self):
+        return any(x is None for x in self)
+
+    def all_f(self, f=bool):
+        return all(f(x) for x in self)
+
+    def any_f(self, f=bool):
+        return any(f(x) for x in self)
+
+    def first_not_none(self):
+        for x in self:
+            if x is not None:
+                return x
+
+    def first_f(self, f=bool):
+        for x in self:
+            if f(x):
+                return x
+
+    def index_f(self, f=bool):
+        for i, x in enumerate(self):
+            if f(x):
+                return i
+        return -1
+
     def clear(self):
-        for x in xrange(len(self)):
-            del self[-1]
+        del self[:]
+        return self
 
     def append(self, x):
         oldlist.append(self, x)
@@ -233,6 +293,8 @@ class list(oldlist):
         return self
 
     def insert(self, i, x):
+        """ corrects negative index origin of original insert that can not append
+        """
         if i < 0:
             if i == -1:
                 return self.append(x)
@@ -282,6 +344,7 @@ class list(oldlist):
 
 
 class set(oldset):
+    # Fixme: sort methods by type, complete methods set
     """
     Replacement class for set
     In place methods return 'self' instead of None
@@ -315,3 +378,62 @@ class set(oldset):
 
     __add__ = __or__
     __iadd__ = __ior__ = update
+
+
+class hdict(olddict):
+    # Fixme: specify first
+    """ hdict (history dict) is a kinnd of immutable dict that preserves its history
+        history is stored in a deque
+    """
+    def __init__(self, *args, **kwargs):
+        """ if histo is a deque, extend the currunt history, eventually erasing future states
+            if histi is None or an int, create a new instance
+        """
+        histo = kwargs.pop('histo', None)
+        dict.__init__(self, *args, **kwargs)
+        if isinstance(histo, deque):
+            self.histo = histo
+            self.pos = kwargs.pop('pos')
+            if self.pos < len(histo):
+                # Fixme truncate end of deque
+                histo[self.pos] = self
+            else:
+                histo.append(self)
+            self.pos += 1
+        else:
+            fork = kwargs.pop('fork', None)
+            if isinstance(fork, hdict):
+                maxlen = histo or fork.histo.maxlen
+                self.histo = deque(fork.histo, maxlen) if maxlen else deque(fork.histo)
+                self.pos = len(self.histo)
+            else:
+                self.histo = deque((self,), histo) if histo else deque((self,))
+                self.pos = 1
+
+    def previous(self):
+        if self.pos > 0:
+            return self.histo[self.pos - 1]
+
+    def next(self):
+        if self.pos < len(self.histo):
+            return self.histo[self.pos + 1]
+
+    def __add__(self, other):
+        if not isinstance(other, olddict):
+            other = dict.fromkeys(other, dict.__default_value__)
+        copy = hdict(self, histo=self.histo)
+        olddict.update(copy, other)
+        return copy
+
+    def clear(self):
+        copy = hdict(self, histo=self.histo, pos=self.pos)
+        olddict.clear(copy)
+        return copy
+
+    def update(self, E={}, **F):
+        copy = hdict(self, histo=self.histo, pos=self.pos)
+        olddict.update(copy, E, **F)
+        return copy
+
+    def fork(self):
+        pass

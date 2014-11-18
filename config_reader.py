@@ -2,6 +2,7 @@
 __version__ = '0.0.1'
 
 # TODO
+# test with nose
 # add a date type with tz in Config
 # add some logging
 
@@ -104,6 +105,9 @@ class Config(dict):
         return copy.deepcopy(self)
 
     def _update(self, other):
+        """ mostly used by override_config
+            parameter is a dictionary with double undescored keys
+        """
         for key, value in other.iteritems():
             r = self
             chain = key.split('__')
@@ -112,7 +116,7 @@ class Config(dict):
                     r = dict.__getitem__(r, k)
                 except KeyError:
                     r[k] = {}
-                    r = r[k]
+                r = r[k]
             if value is None:
                 try:
                     del r[chain[-1]]
@@ -292,10 +296,12 @@ class ParserResolver(object):
         if isinstance(parser, basestring):
             parser = self.parsers_dict[parser]
         try:
-            return Config(parser(path))
+            conf = Config(parser(path))
+            return conf
         except IOError:
             raise
-        except Exception:
+        except Exception as e:
+            # Fixme add logging here
             pass
 
     def get_config_from_file(self, parser, path):
@@ -371,6 +377,7 @@ class ParserResolver(object):
         if config is None:
             raise ConfigurationFileError(
                 "Could not read configuration file %s with parser %s", (path, parser.__name__))
+        return config
 
 
 class CachedConfigReader(object):
@@ -388,6 +395,7 @@ class CachedConfigReader(object):
       cr.read_config(config_file) reads and cache the specified config file as a Config object.
     """
     dir_cache = {}
+    check_dir = True  # used by test suite
     default_parser = 'guess'
     default_config = None
 
@@ -404,16 +412,25 @@ class CachedConfigReader(object):
             if arg is not None:
                 return arg
 
+    @staticmethod
+    def all_none(*args):
+        return all(arg is None for arg in args)
+
     @classmethod
     def set_default_parser(cls, parser):
         cls.default_parser = parser
         return cls
 
     @classmethod
+    def reload_all(cls):
+        cls.dir_cache = {}
+        return cls
+
+    @classmethod
     def get_instance(cls, config_dir, parser=None, default=None):
         path = os.path.abspath(config_dir)
         if path not in cls.dir_cache:
-            if CachedConfigReader.first_not_none(default, cls.default_config) is None:
+            if cls.check_dir and CachedConfigReader.all_none(default, cls.default_config):
                 if not os.access(path, os.R_OK):
                     raise IOError("%s: folder missing or read access forbidden" % path)
             cls.dir_cache[path] = CachedConfigReader(path, parser, default)
@@ -428,7 +445,7 @@ class CachedConfigReader(object):
             try:
                 parser = parser or self.default_parser or self.__class__.default_parser
                 if parser is None:
-                    raise ConfigurationFileError("No parser specified for file: %s" % path)
+                    raise ConfigurationParserError("No parser specified for file: %s" % path)
                 config = ParserResolver().get_config(parser, path)
             except Exception:
                 default = CachedConfigReader.first_not_none(default, self.default_config, self.__class__.default_config)

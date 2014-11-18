@@ -3,7 +3,7 @@
 import mock
 import unittest
 
-from config_reader import CachedConfigReader, ini_parser, json_parser, ConfigurationFileError
+from config_reader import *
 
 CachedConfigReader.check_dir = False
 
@@ -82,62 +82,78 @@ def mock_open_error(*args):
 
 class ConfigReaderTestCase(unittest.TestCase):
 
-    def test_default_parser(self):
+    def setUp(self):
+        CachedConfigReader.reload_all()
+        CachedConfigReader.check_dir = False
+        CachedConfigReader.default_parser = 'guess'
+        CachedConfigReader.default_config = None
+
+    def test_defaults(self):
+        ccr = CachedConfigReader.get_instance('dummy')
         with mock.patch('__builtin__.open', mock_open(ini_file)):
-            ccr = CachedConfigReader.get_instance('dummy')
-            self.assertEqual(ccr.default_parser, ini_parser)
+            self.assertEqual(ccr.__class__.default_parser, 'guess')
+            self.assertEqual(ccr.default_parser, None)
             conf = ccr.read_config('conf.ini')
             self.assertEqual(conf.get('owner.name'), 'juan dona')
 
-    def test_set_default_parser(self):
+    def test_no_parser(self):
+        CachedConfigReader.default_parser = None
+        ccr = CachedConfigReader.get_instance('dummy')
+        self.assertRaises(ConfigurationParserError, ccr.read_config, 'any_file')
+
+    def test_class_default_parser(self):
+        CachedConfigReader.set_default_parser('json')
+        ccr = CachedConfigReader.get_instance('dummy')
         with mock.patch('__builtin__.open', mock_open(json_file)):
-            ccr = CachedConfigReader.get_instance('dummy')
-            CachedConfigReader.set_default_parser('json')
-            self.assertEqual(ccr.default_parser, json_parser)
+            self.assertEqual(ccr.__class__.default_parser, 'json')
             conf = ccr.read_config('conf.json')
             self.assertEqual(conf.get('menu.value'), 'File')
-            CachedConfigReader.set_default_parser('ini')
 
     def test_cached_instance(self):
+        ccr = CachedConfigReader.get_instance('dummy')
         with mock.patch('__builtin__.open', mock_open(ini_file)):
-            ccr = CachedConfigReader.get_instance('dummy')
-            conf = ccr.read_config('conf4.ini')
+            conf = ccr.read_config('conf.ini')
             self.assertEqual(conf.get('owner.name'), 'juan dona')
             ccr2 = CachedConfigReader.get_instance('dummy')
-            conf2 = ccr2.read_config('conf4.ini', 'random_parser')    # parser is ignored
+            conf2 = ccr2.read_config('conf.ini', 'random_parser')    # parser is ignored
             self.assertIs(ccr, ccr2)
             self.assertIs(conf, conf2)
 
     def test_wrong_folder_raise(self):
         CachedConfigReader.check_dir = True
-        try:
-            self.assertRaises(IOError, CachedConfigReader.get_instance, '/doesnotexists')
-        finally:
-            CachedConfigReader.check_dir = False
+        self.assertRaises(IOError, CachedConfigReader.get_instance, '/doesnotexists')
 
     def test_wrong_file_noraise(self):
+        ccr = CachedConfigReader.get_instance('dummy')
         with mock.patch('__builtin__.open', mock_open_error):
-            ccr = CachedConfigReader.get_instance('dummy')
-            conf = ccr.read_config('conf2.ini')
+            conf = ccr.read_config('conf.ini', default={})
             self.assertEqual(dict(conf), {})
 
     def test_wrong_file_raise(self):
+        ccr = CachedConfigReader.get_instance('dummy')
         with mock.patch('__builtin__.open', mock_open_error):
-            ccr = CachedConfigReader.get_instance('dummy')
-            self.assertRaises(ConfigurationFileError, ccr.read_config, 'conf3.ini', None, '__raise__')
+            self.assertRaises(ConfigurationFileError, ccr.read_config, 'conf.ini')
 
     def test_wrong_parser_noraise(self):
-        pass
+        ccr = CachedConfigReader.get_instance('dummy')
+        with mock.patch('__builtin__.open', mock_open(ini_file)):
+            conf = ccr.read_config('conf.ini', 'random_parser', {})
+            self.assertEqual(dict(conf), {})
 
     def test_wrong_parser_raise(self):
-        pass
+        ccr = CachedConfigReader.get_instance('dummy')
+        with mock.patch('__builtin__.open', mock_open(ini_file)):
+            self.assertRaises(ConfigurationParserError, ccr.read_config, 'conf.ini', 'random_parser')
 
     def test_ini_parser(self):
-        pass
+        ccr = CachedConfigReader.get_instance('dummy')
+        with mock.patch('__builtin__.open', mock_open(ini_file)):
+            conf = ccr.read_config('conf.ini', 'ini')     # override default parser
+            self.assertEqual(conf.get('owner.name'), 'juan dona')
 
     def test_json_parser(self):
+        ccr = CachedConfigReader.get_instance('dummy')
         with mock.patch('__builtin__.open', mock_open(json_file)):
-            ccr = CachedConfigReader.get_instance('dummy')
             conf = ccr.read_config('conf.json', 'json')     # override default parser
             self.assertEqual(conf.get('menu.value'), 'File')
             self.assertEqual(conf.get('menu.id'), 1)
@@ -149,10 +165,20 @@ class ConfigReaderTestCase(unittest.TestCase):
         pass
 
     def test_guess_parser_from_extension(self):
-        pass
+        ccr = CachedConfigReader.get_instance('dummy')
+        with mock.patch('__builtin__.open', mock_open(json_file)):
+            conf = ccr.read_config('conf.json', 'guess')     # override default parser
+            self.assertEqual(conf.get('menu.value'), 'File')
+            self.assertEqual(conf.get('menu.id'), 1)
+        with mock.patch('__builtin__.open', mock_open(ini_file)):
+            conf = ccr.read_config('conf.ini', 'guess')     # override default parser
+            self.assertEqual(conf.get('owner.name'), 'juan dona')
 
     def test_guess_parser_from_comment(self):
-        pass
+        ccr = CachedConfigReader.get_instance('dummy')
+        with mock.patch('__builtin__.open', mock_open(ini_file)):
+            conf = ccr.read_config('conf.json', 'guess')     # override default parser
+            self.assertEqual(conf.get('owner.name'), 'juan dona')
 
     def test_guess_parser_from_content(self):
         pass
