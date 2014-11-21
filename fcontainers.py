@@ -2,15 +2,20 @@
 __version__ = '0.0.1'
 
 # TODO
-# draw a clear line between mutable and immutable methods
 # tester différentes implémentations (speed) ex: set.contains_all iterator vs set arithmetic
 # éventuellement mettre 2 implémentations avec un test (dict.__and__)
 # design a purely immutable dict class with history stored in deque
 # voir lodash.js pour d'autres idées
+# trouver un moyen d'importer soit un remplacement (même nom), soit un autre nom
+# tester en python 2 et python 3
+# faire un repo dédié
 
 __all__ = ['dict', 'list', 'set', 'DuplicateValueError']
 
+from bisect import bisect_left
 from collections import defaultdict, deque
+from operator import add
+import re
 
 olddict = dict
 oldlist = list
@@ -18,6 +23,14 @@ oldset = set
 
 
 class DuplicateValueError(ValueError):
+    pass
+
+
+class UnknownOperatorError(ValueError):
+    pass
+
+
+class UnknownREFlagError(ValueError):
     pass
 
 
@@ -32,24 +45,29 @@ class ReverseDictFactory(object):
     class _count(object):
         def __init__(self):
             self.value = 0
+
         def add(self, k, v):
             self.value += 1
+
         def val(self):
             return self.value
 
     class _list(list):
         def add(self, k, v):
             self.append(k)
+
         def val(self):
             return self
 
     class _raise(object):
         def __init__(self):
             self.value = ReverseDictFactory.NoneObject
+
         def add(self, k, v):
             if self.value is not ReverseDictFactory.NoneObject:
                 raise DuplicateValueError("Duplicate value '%s' found for keys '%s' and '%s'" % (v, k, self.value))
             self.value = k
+
         def val(self):
             return self.value
 
@@ -62,7 +80,119 @@ class ReverseDictFactory(object):
         }[case])
 
 
+class Where(object):
+    # Fixme voir django pour compléter les méthodes
+    """
+    Implements 'where' features for search in containers
+    """
+
+    def __init__(self, *terms):
+        """ terms is a list of dictionaries
+            representing a disjunction (or) of conjunctions (and)
+        """
+        self.terms = []
+        for t in terms:
+            term = []
+            self.terms.append(term)
+            for k, v in t.iteritems():
+                try:
+                    field, op = k.split('__')
+                    op = self.operators[op]
+                except ValueError:
+                    field, op = k, self.equals
+                except KeyError:
+                    raise UnknownOperatorError("Operator '%s'" % op)
+                term.append((field, op, v))
+
+    def equals(self, record, field, value):
+        return type(value)(record[field]) == value
+
+    def notequals(self, record, field, value):
+        return type(value)(record[field]) != value
+
+    def gt(self, record, field, value):
+        return type(value)(record[field]) > value
+
+    def gte(self, record, field, value):
+        return type(value)(record[field]) >= value
+
+    def lt(self, record, field, value):
+        return type(value)(record[field]) < value
+
+    def lte(self, record, field, value):
+        return type(value)(record[field]) <= value
+
+    def inrange(self, record, field, value):
+        lo, hi = value
+        t = type(lo)
+        assert t is type(hi)
+        return lo <= t(record[field]) < hi
+
+    def contains(self, record, field, value):
+        return value in record[field]
+
+    def icontains(self, record, field, value):
+        return value in record[field].lower()
+
+    def startswith(self, record, field, value):
+        return record[field].startswith(value)
+
+    def istartswith(self, record, field, value):
+        return record[field].lower().startswith(value)
+
+    def endswith(self, record, field, value):
+        return record[field].endswith(value)
+
+    def iendswith(self, record, field, value):
+        return record[field].lower().endswith(value)
+
+    def __call__(self, record):
+        # Fixme tester ça
+        return any(
+            all(op(self, record, field, value) for field, op, value in t)
+            for t in self.terms)
+
+    operators = dict(
+        equals=equals, eq=equals,
+        notequals=notequals, neq=notequals,
+        gt=gt, gte=gte, lt=lt, lte=lte,
+        inrange=inrange,
+        contains=contains,
+        icontains=icontains,
+        startswith=startswith,
+        istartswith=istartswith,
+        endswith=endswith,
+        iendswith=iendswith,
+    )
+
+
+class RegExp(object):
+    """ Implements Regulare expressions for searching into containers
+    """
+
+    def __init__(self, regexp, flags='', match=False):
+        self.match = match
+        re_flags = 0
+        try:
+            for f in flags.lower():
+                re_flags |= self.flags_dict[f]
+        except KeyError:
+            raise UnknownREFlagError("Reg Exp flag %s unknown" % f)
+        self.re = re.compile(regexp, re_flags)
+
+    def __call__(self, record):
+        if self.match:
+            return self.re.match(record)
+        return self.re.search(record)
+
+    flags_dict = dict(
+        a=re.A, i=re.I, l=re.L, m=re.M,
+        s=re.S, u=re.U, x=re.X
+    )
+
+
 class dict(olddict):
+    # Fixme: write complete doc
     """
     Replacement class for dict
     In place methods return 'self' instead of None
@@ -148,27 +278,31 @@ class dict(olddict):
     __isub__ = discard_all
     __iand__ = __imul__ = project
 
-    # immutable methods (return a copy)
+    # immutable methods (return another dict)
 
-    def filter_key(self, f=bool):
+    def filter_key(self, f=bool, negate=False):
         """ Returns a copy of self filtered on keys that satisfy f
         """
-        return {k: v for k, v in self.iteritems() if f(k)}
+        if negate:
+            return {k: v for k, v in self.iteritems() if f(k)}
+        else:
+            return {k: v for k, v in self.iteritems() if f(k)}
 
-    def filter_value(self, f=bool):
+    def filter_value(self, f=bool, negate=False):
         """ Returns a copy of self filtered on values that satisfy f
         """
-        return {k: v for k, v in self.iteritems() if f(v)}
+        if negate:
+            return {k: v for k, v in self.iteritems() if f(v)}
+        else:
+            return {k: v for k, v in self.iteritems() if f(v)}
 
-    def filter(self, f=tuple):
+    def filter(self, f=tuple, negate=False):
         """ Returns a copy of self filtered by f(key, value)
         """
-        return {k: v for k, v in self.iteritems() if f(k, v)}
-
-    def search(self, text):
-        """ Returns a copy of self filtered on keys that contain the search text
-        """
-        return {k: v for k, v in self.iteritems() if text in k}
+        if negate:
+            return {k: v for k, v in self.iteritems() if f(k, v)}
+        else:
+            return {k: v for k, v in self.iteritems() if f(k, v)}
 
     def reverse(self, duplicate=None):
         """ reverse the dictionary (exchange keys and values)
@@ -200,6 +334,7 @@ class dict(olddict):
         return dict(self).update(other)
 
     def __sub__(self, other):
+        # Fixme: optimize
         """ Immutable version of discard_all
         """
         return dict(self).discard_all(other)
@@ -218,30 +353,30 @@ class dict(olddict):
     # helper methods (return a value)
 
     def contains_all(self, iterable):
-        """ True if every element of iterable is aalso a key of self
+        """ True if every element of iterable is a key of self
         """
         return all(i in self for i in iterable)
 
     def contains_any(self, iterable):
-        """ True if any element of iterable is aalso a key of self
+        """ True if any element of iterable is a key of self
         """
         return any(i in self for i in iterable)
 
     def all_in(self, container):
-        """ True if all keys of self is also in container
+        """ True if all keys of self are also in container
             use preferably if container.__contains__() evaluates in constant time
         """
         return all(i in container for i in self)
 
     def any_in(self, container):
-        """ True if any key of self is also in container
+        """ True if any key of self are also in container
             use preferably if container.__contains__() evaluates in constant time
         """
         return any(i in container for i in self)
 
 
 class list(oldlist):
-    # Fixme: sort methods by type
+    # Fixme: write complete doc
     """
     Replacement class for list
     defines new methods that are both static and instance methods
@@ -252,33 +387,7 @@ class list(oldlist):
     """
     list = oldlist
 
-    def all_none(self):
-        return all(x is None for x in self)
-
-    def any_none(self):
-        return any(x is None for x in self)
-
-    def all_f(self, f=bool):
-        return all(f(x) for x in self)
-
-    def any_f(self, f=bool):
-        return any(f(x) for x in self)
-
-    def first_not_none(self):
-        for x in self:
-            if x is not None:
-                return x
-
-    def first_f(self, f=bool):
-        for x in self:
-            if f(x):
-                return x
-
-    def index_f(self, f=bool):
-        for i, x in enumerate(self):
-            if f(x):
-                return i
-        return -1
+    # mutable methods (return self)
 
     def clear(self):
         del self[:]
@@ -331,8 +440,18 @@ class list(oldlist):
         oldlist.sort(self, **p)
         return self
 
-    def search(self, text):
-        return [x for x in self if text in x]
+    __isub__ = discard_all
+
+    # immutable methods (return another list)
+
+    def filter(self, f=bool, negate=False):
+        """ Returns a copy of self, retainning elements that satisfy f.
+            You can specify f=Where(terms) to filter a list of dict,
+        """
+        if negate:
+            return [x for x in self if not f(x)]
+        else:
+            return [x for x in self if f(x)]
 
     def __add__(self, iterable):
         return list(self).extend(iterable)
@@ -340,7 +459,68 @@ class list(oldlist):
     def __sub__(self, iterable):
         return list(self).discard_all(iterable)
 
-    __isub__ = discard_all
+    # helper methods (return a value)
+
+    def get(self, pos, default=None):
+        try:
+            return self[pos]
+        except IndexError:
+            return default
+
+    def all_f(self, f=bool):
+        """ True if all elements satisfy f
+        """
+        return all(f(x) for x in self)
+
+    def any_f(self, f=bool):
+        """ True if any element satisfy f
+        """
+        return any(f(x) for x in self)
+
+    def reduce(self, f=bool):
+        """ Returns the sum of the values of f calculated on each element
+            if f returns a boolean, this counts the number of elements that satisfy f
+        """
+        return reduce(add, (f(x) for x in self))
+
+    count = reduce
+
+    def first_f(self, f=bool, negate=False):
+        """ Returns the first element that satisfies f.
+            You can specify f=Where(terms) to perform search a list of dict
+        """
+        if negate:
+            for x in self:
+                if not f(x):
+                    return x
+        else:
+            for x in self:
+                if f(x):
+                    return x
+
+    def index_b(self, value, start=0, stop=None):
+        """ Performs binary search on sorted lists
+        """
+        if stop is None:
+            stop = len(self)
+        i = bisect_left(self, value, start, stop)
+        if i < len(self) and self[i] == value:
+            return i
+        return -1
+
+    def index_f(self, start=0, f=bool, negate=False):
+        """ Returns the index of the first element that satisfies f
+        """
+        if negate:
+            for i in xrange(start, len(self)):
+                if not f(self[i]):
+                    return i
+            return -1
+        else:
+            for i in xrange(start, len(self)):
+                if f(self[i]):
+                    return i
+            return -1
 
 
 class set(oldset):
