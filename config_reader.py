@@ -5,6 +5,7 @@ __version__ = '0.0.1'
 # test with nose
 # add a date type with tz in Config
 # add some logging
+# see this: http://decalage.info/fr/python/configparser
 
 import copy
 import functools
