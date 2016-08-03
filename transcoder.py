@@ -2,38 +2,48 @@
 
 # rewrites a text file from source-encoding to target-encoding
 
-__version__ = '0.1.0'
-__date__    = 'jan 04th, 2013'
-__author__ = 'François Vincent'
-__mail__ = 'fvincent@groupeseb.com'
-__github__ = 'https://github.com/francois-vincent'
-
-import sys, os
 import codecs
+import glob
+import os
 
-if len(sys.argv) <> 4:
-    print 'Usage:', sys.argv[0], '<filename> <source-encoding> <target-encoding>'
-    sys.exit()
-filename = sys.argv[1]
-if not os.access(filename, os.W_OK):
-    print 'Nonexistent or non-writable file', filename
-    sys.exit()
-fromencoding = sys.argv[2]
-toencoding = sys.argv[3]
-try:
-    codecs.lookup(fromencoding)
-except LookupError:
-    print "can't find source encoding", fromencoding
-    sys.exit()
-try:
-    codecs.lookup(toencoding)
-except LookupError:
-    print "can't find target encoding", toencoding
-    sys.exit()
+from clingon import clingon
 
-with open(filename, 'rb+') as f:
-    data = f.read()
-    data = data.decode(fromencoding).encode(toencoding)
-    f.seek(0)
-    f.write(data)
-    f.truncate()
+
+@clingon.clize
+def transcoder(source, fromencoding, toencoding, rewrite=False):
+    """
+    A file transcoder utility written in python.
+    Can convert from any supported python text code to any other one.
+    """
+    if rewrite and not os.access(source, os.W_OK):
+        print('Nonexistent or non-writable file ' + source)
+        return 1
+    if not os.access(source, os.R_OK):
+        print('Missing file ' + source)
+        return 1
+
+    try:
+        codecs.lookup(fromencoding)
+    except LookupError:
+        print("can't find source encoding " + fromencoding)
+        return 1
+    try:
+        codecs.lookup(toencoding)
+    except LookupError:
+        print("can't find target encoding " + toencoding)
+        return 1
+
+    if rewrite:
+        with open(source, 'rb+') as f:
+            data = f.read()
+            data = data.decode(fromencoding).encode(toencoding)
+            f.seek(0)
+            f.write(data)
+            f.truncate()
+        return
+
+    destination = max(glob.glob(source + '*')) + '.backup'
+    with open(source, 'rb') as fs, open(destination, 'wb') as fd:
+        data = fs.read()
+        data = data.decode(fromencoding).encode(toencoding)
+        fd.write(data)
