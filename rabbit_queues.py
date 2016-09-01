@@ -55,6 +55,7 @@ def rabbit_queues(command='sudo /usr/sbin/rabbitmqctl list_queues',
                   prefix='kraken_mut-prd-',
                   limit=10,
                   truncate=5,
+                  full_name=False,
                   no_double=False):
     """
     Nagios probe that checks RabbitMQ queues that are not empty.
@@ -62,6 +63,8 @@ def rabbit_queues(command='sudo /usr/sbin/rabbitmqctl list_queues',
     Param 'prefix' is a filter on queues names prefix.
     Param 'limit' is a filter on queues depth.
     Param 'truncate' will truncate the number of reported queues (if !=0).
+    Param 'full_name' will toggle between stripping or not the matching prefix
+      in the name of the queue.
     Param 'no_double' will toggle between single and double check.
     """
     try:
@@ -71,7 +74,7 @@ def rabbit_queues(command='sudo /usr/sbin/rabbitmqctl list_queues',
             print('Critical {} error: return code={}'.format(command, p.returncode))
             exit(NAGIOS_CRITICAL)
         queues = [q.split() for q in stdout.split('\n') if q.startswith(prefix)]
-        queues = set(q.replace(prefix, '') for q, d in queues if int(d) >= limit)
+        queues = set(q if full_name else q[len(prefix):] for q, d in queues if int(d) >= limit)
         if not no_double:
             persist = Persistence()
             try:
