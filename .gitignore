@@ -1,14 +1,9 @@
-# Compiled/auto-generated
-*.pyc
-*.pyo
-*.mo
-djangousers/static/
-logs/
+__pycache__/
+*.py[cod]
 
-# Editor files
-.idea/
+.idea
+.cache/
 
-# Environment
-venv/
-
-*.crt
+build/
+dist/
+sdist/
