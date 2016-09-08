@@ -3,7 +3,7 @@
 import mock
 import unittest
 
-from config_reader import *
+from ..config_reader import *
 
 CachedConfigReader.check_dir = False
 
