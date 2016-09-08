@@ -3,7 +3,7 @@
 import itertools
 
 
-def CloseProduct(*sequences):
+def close_product(*sequences):
     """ returns a sequence over the cartesian product of parameter sequences but,
         unlike itertools.product, orders the resulting sequence in increasing
         distance order wrt origin, in terms of indices, e.g. :
@@ -17,5 +17,7 @@ def CloseProduct(*sequences):
 
 
 if __name__ == '__main__':
-    for i in CloseProduct(('a','b','c','d'), ('a','b'), ('a','b')):
-        print i
+    for i in close_product((0, 1, 2, 3), (0, 1), (0, 1)):
+        print(i)
+    for i in close_product(('a', 'b', 'c', 'd'), ('a', 'b'), ('a', 'b')):
+        print(i)
