@@ -33,7 +33,7 @@ class bdict(dict):
         return self
 
     def __sub__(self, other):
-        for k in other.iterkeys():
+        for k in other:
             try:
                 del self[k]
             except KeyError:

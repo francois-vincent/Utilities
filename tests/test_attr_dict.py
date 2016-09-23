@@ -11,8 +11,6 @@ def test_simple_access():
     assert d['a'] == d.a
     assert d.a == 1
     assert d.b == 2
-    assert d.update
-    assert d.pull
 
 
 def test_context_manager():
