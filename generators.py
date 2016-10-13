@@ -48,7 +48,7 @@ def integer_filter(*a):
                             d = div[0]
                             div[1] += d + d
                             hit = True
-                            # small optimization for large numbers
+                            # optimization for large numbers
                             j /= d
                             if j == 1:
                                 break
@@ -58,29 +58,52 @@ def integer_filter(*a):
     return f()
 
 
+def gen_slice(gen, a, b=None):
+    """ yields a window of values out of another generator
+    :param gen: a generator
+    :param a: if b is None, a is the number of values yielded
+    :param b: if not None, b is the number of values yielded
+              and a is the number of values skipped.
+    """
+    if b is None:
+        b, a = a,  0
+    for _ in xrange(a):
+        next(gen)
+    for _ in xrange(b):
+        yield next(gen)
+
+
+def gen_binary(gen, op, inv=False):
+    """ yields the result of a binary operator between consecutive values of a generator
+    :param gen: a generator
+    :param op: a binary operator
+    :param inv: if inv is True, the operands are inverted
+    """
+    a = next(gen)
+    while True:
+        b = next(gen)
+        yield op(b, a) if inv else op(a, b)
+        a = b
+
+
 if __name__ == '__main__':
-    ii = infinite_integer()
-    for n in xrange(30):
-        print(next(ii), end=' ')
-    print('\n')
+    # slice of 10 first integers
+    assert list(gen_slice(infinite_integer(), 10)) == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-    ii = infinite_integer(5, 5)
-    for n in xrange(30):
-        print(next(ii), end=' ')
-    print('\n')
+    # slice of 3 integers after 10 first
+    assert list(gen_slice(infinite_integer(), 10, 3)) == [10, 11, 12]
 
-    # this will filter out all multiples of 2 and 3
-    inf = integer_filter(2, 3)
-    for n in xrange(30):
-        print(next(inf), end=' ')
-    print('\n')
+    # slice of 10 first multiples of 5
+    assert list(gen_slice(infinite_integer(5, 5), 10)) == [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
-    # this will print first primes
-    inf = integer_filter()
-    for n in xrange(30):
-        print(next(inf), end=' ')
-    print('\n')
+    # slice of 20 first integers not multiple of 2 and 3
+    assert list(gen_slice(integer_filter(2, 3), 20)) == [1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37,
+                                                         41, 43, 47, 49, 53, 55, 59]
 
+    # a slice can be applied on a shorter generator
+    assert list(gen_slice(iter(xrange(5)), 10)) == [0, 1, 2, 3, 4]
+
+    # check first 200 primes
     first_primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101,
             103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199,
             211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317,
@@ -91,5 +114,20 @@ if __name__ == '__main__':
             853, 857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929, 937, 941, 947, 953, 967, 971, 977, 983,
             991, 997, 1009, 1013, 1019, 1021, 1031, 1033, 1039, 1049, 1051, 1061, 1063, 1069, 1087, 1091, 1093,
             1097, 1103, 1109, 1117, 1123, 1129, 1151, 1153, 1163, 1171, 1181, 1187, 1193, 1201, 1213, 1217, 1223]
-    inf = integer_filter()
-    assert [next(inf) for _ in xrange(200)] == first_primes
+    assert list(gen_slice(integer_filter(), 200)) == first_primes
+
+    # check 5 primes after 1000th
+    assert list(gen_slice(integer_filter(), 1000, 5)) == [7927, 7933, 7937, 7949, 7951]
+
+    from operator import add, sub
+    assert list(gen_binary(iter(xrange(7)), add)) == [1, 3, 5, 7, 9, 11]
+
+    # check the 50 first consecutive primes differences
+    primes_diff = [1, 2, 2, 4, 2, 4, 2, 4, 6, 2, 6, 4, 2, 4, 6, 6, 2, 6, 4, 2, 6, 4, 6, 8, 4, 2, 4, 2, 4, 14, 4, 6, 2,
+                   10, 2, 6, 6, 4, 6, 6, 2, 10, 2, 4, 2, 12, 12, 4, 2]
+    assert list(gen_binary(gen_slice(integer_filter(), 50), sub, inv=True)) == primes_diff
+
+    # check the max gap between 2000 first primes
+    assert max(gen_binary(gen_slice(integer_filter(), 2000), sub, inv=True)) == 44
+
+    print("All tests OK !")
