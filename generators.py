@@ -58,50 +58,51 @@ def integer_filter(*a):
     return f()
 
 
-def gen_slice(gen, a, b=None):
-    """ yields a window of values out of another generator
-    :param gen: a generator
+def it_window(it, a, b=None):
+    """ yields a window of values out of an iterator
+    :param it: an iterator
     :param a: if b is None, a is the number of values yielded
     :param b: if not None, b is the number of values yielded
               and a is the number of values skipped.
+    Notice: use 'from itertools import islice' instead
     """
     if b is None:
-        b, a = a,  0
+        b, a = a, 0
     for _ in xrange(a):
-        next(gen)
+        next(it)
     for _ in xrange(b):
-        yield next(gen)
+        yield next(it)
 
 
-def gen_binary(gen, op, inv=False):
-    """ yields the result of a binary operator between consecutive values of a generator
-    :param gen: a generator
+def it_binary(it, op, inv=False):
+    """ yields the result of a binary operator between consecutive values of an iterator
+    :param it: an iterator
     :param op: a binary operator
     :param inv: if inv is True, the operands are inverted
     """
-    a = next(gen)
+    a = next(it)
     while True:
-        b = next(gen)
+        b = next(it)
         yield op(b, a) if inv else op(a, b)
         a = b
 
 
 if __name__ == '__main__':
     # slice of 10 first integers
-    assert list(gen_slice(infinite_integer(), 10)) == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert list(it_window(infinite_integer(), 10)) == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
     # slice of 3 integers after 10 first
-    assert list(gen_slice(infinite_integer(), 10, 3)) == [10, 11, 12]
+    assert list(it_window(infinite_integer(), 10, 3)) == [10, 11, 12]
 
     # slice of 10 first multiples of 5
-    assert list(gen_slice(infinite_integer(5, 5), 10)) == [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+    assert list(it_window(infinite_integer(5, 5), 10)) == [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
     # slice of 20 first integers not multiple of 2 and 3
-    assert list(gen_slice(integer_filter(2, 3), 20)) == [1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37,
+    assert list(it_window(integer_filter(2, 3), 20)) == [1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37,
                                                          41, 43, 47, 49, 53, 55, 59]
 
     # a slice can be applied on a shorter generator
-    assert list(gen_slice(iter(xrange(5)), 10)) == [0, 1, 2, 3, 4]
+    assert list(it_window(iter(xrange(5)), 10)) == [0, 1, 2, 3, 4]
 
     # check first 200 primes
     first_primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101,
@@ -114,20 +115,20 @@ if __name__ == '__main__':
             853, 857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929, 937, 941, 947, 953, 967, 971, 977, 983,
             991, 997, 1009, 1013, 1019, 1021, 1031, 1033, 1039, 1049, 1051, 1061, 1063, 1069, 1087, 1091, 1093,
             1097, 1103, 1109, 1117, 1123, 1129, 1151, 1153, 1163, 1171, 1181, 1187, 1193, 1201, 1213, 1217, 1223]
-    assert list(gen_slice(integer_filter(), 200)) == first_primes
+    assert list(it_window(integer_filter(), 200)) == first_primes
 
     # check 5 primes after 1000th
-    assert list(gen_slice(integer_filter(), 1000, 5)) == [7927, 7933, 7937, 7949, 7951]
+    assert list(it_window(integer_filter(), 1000, 5)) == [7927, 7933, 7937, 7949, 7951]
 
     from operator import add, sub
-    assert list(gen_binary(iter(xrange(7)), add)) == [1, 3, 5, 7, 9, 11]
+    assert list(it_binary(iter(xrange(7)), add)) == [1, 3, 5, 7, 9, 11]
 
     # check the 50 first consecutive primes differences
     primes_diff = [1, 2, 2, 4, 2, 4, 2, 4, 6, 2, 6, 4, 2, 4, 6, 6, 2, 6, 4, 2, 6, 4, 6, 8, 4, 2, 4, 2, 4, 14, 4, 6, 2,
                    10, 2, 6, 6, 4, 6, 6, 2, 10, 2, 4, 2, 12, 12, 4, 2]
-    assert list(gen_binary(gen_slice(integer_filter(), 50), sub, inv=True)) == primes_diff
+    assert list(it_binary(it_window(integer_filter(), 50), sub, inv=True)) == primes_diff
 
     # check the max gap between 2000 first primes
-    assert max(gen_binary(gen_slice(integer_filter(), 2000), sub, inv=True)) == 44
+    assert max(it_binary(it_window(integer_filter(), 2000), sub, inv=True)) == 44
 
     print("All tests OK !")
