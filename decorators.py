@@ -1,5 +1,6 @@
 # Copyright 2016 Kosc Telecom
 
+
 def memoize(f):
     """ Memoization decorator for a function with positional args only
     """

@@ -16,8 +16,20 @@ def close_product(*sequences):
     return [[sequences[i][j] for i, j in enumerate(x)] for x in product]  # restore sequences from indices
 
 
+def chunk_iter(iterable, chunk_size):
+    iterator = iter(iterable)
+    while True:
+        n = next(iterator)
+        yield itertools.chain((n,), itertools.islice(iterator, chunk_size - 1))
+
+
 if __name__ == '__main__':
     for i in close_product((0, 1, 2, 3), (0, 1), (0, 1)):
         print(i)
     for i in close_product(('a', 'b', 'c', 'd'), ('a', 'b'), ('a', 'b')):
         print(i)
+
+    for x in chunk_iter(xrange(10), 3):
+        print(tuple(x))
+
+    assert tuple(''.join(x) for x in chunk_iter('abcdefghij', 3)) == ('abc', 'def', 'ghi', 'j')
