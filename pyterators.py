@@ -17,6 +17,7 @@ def close_product(*sequences):
 
 
 def chunk_iter(iterable, chunk_size):
+    assert chunk_size > 1
     iterator = iter(iterable)
     while True:
         n = next(iterator)

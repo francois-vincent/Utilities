@@ -1,4 +1,4 @@
-# Copyright 2016 Kosc Telecom
+# -*- coding: utf-8 -*-
 
 
 def memoize(f):

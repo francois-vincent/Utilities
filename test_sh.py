@@ -7,7 +7,7 @@ from threading import Thread
 import time
 
 # ps aux | grep ssh | awk '{print $11}'
-print(sh.awk(sh.grep(sh.ps('aux'), 'ssh'), '{print $11}'))
+# print(sh.awk(sh.grep(sh.ps('aux'), 'ssh'), '{print $11}'))
 
 print(sh.grep(sh.docker.version(), 'Version:'))
 
