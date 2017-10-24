@@ -1,4 +1,6 @@
 # coding: utf8
+# see: http://graphemica.com/unicode/characters
+# TODO check codecs for unicode translating and compare speed
 
 from __future__ import unicode_literals
 
