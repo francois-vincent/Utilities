@@ -1,41 +1,7 @@
 
 import pytest
 
-from ..utilities import extract_translate, SkipMissing, get_accessors_for_object
-
-
-def test_default():
-    d = dict(a=1, b=2)
-    res = extract_translate(d, dict(a='A', b='B', c='C'))
-    assert d == dict(a=1, b=2)
-    assert res == dict(A=1, B=2, C=None)
-
-
-def test_default_value():
-    d = dict(a=1, b=2)
-    res = extract_translate(d, dict(a='A', b='B', c='C'), default=3)
-    assert d == dict(a=1, b=2)
-    assert res == dict(A=1, B=2, C=3)
-
-
-def test_remove():
-    d = dict(a=1, b=2)
-    res = extract_translate(d, dict(a='A', b='B', c='C'), remove=True)
-    assert d == {}
-    assert res == dict(A=1, B=2, C=None)
-
-
-def test_raises():
-    d = dict(a=1, b=2)
-    with pytest.raises(KeyError):
-        extract_translate(d, dict(a='A', b='B', c='C'), default=Exception)
-
-
-def test_skip():
-    d = dict(a=1, b=2)
-    res = extract_translate(d, dict(a='A', b='B', c='C'), default=SkipMissing)
-    assert d == dict(a=1, b=2)
-    assert res == dict(A=1, B=2)
+from ..utilities import extract_translate, extract_dict, SkipMissing, get_accessors_for_object
 
 
 def test_accessor_object():
@@ -56,3 +22,69 @@ def test_accessor_dict():
     assert get('a') == 1
     set('b', 2)
     assert get('a') == 1
+
+
+class TestExtractTranslate(object):
+    trans = dict(a='A', b='B', c='C')
+
+    def test_default(self):
+        d = dict(a=1, b=2)
+        res = extract_translate(d, self.trans)
+        assert d == dict(a=1, b=2)
+        assert res == dict(A=1, B=2, C=None)
+
+    def test_default_value(self):
+        d = dict(a=1, b=2)
+        res = extract_translate(d, self.trans, default=3)
+        assert d == dict(a=1, b=2)
+        assert res == dict(A=1, B=2, C=3)
+
+    def test_remove(self):
+        d = dict(a=1, b=2)
+        res = extract_translate(d, self.trans, remove=True)
+        assert d == {}
+        assert res == dict(A=1, B=2, C=None)
+
+    def test_raises(self):
+        d = dict(a=1, b=2)
+        with pytest.raises(KeyError):
+            extract_translate(d, self.trans, default=Exception)
+
+    def test_skip(self):
+        d = dict(a=1, b=2)
+        res = extract_translate(d, self.trans, default=SkipMissing)
+        assert d == dict(a=1, b=2)
+        assert res == dict(A=1, B=2)
+
+
+class TestExtractDict(object):
+    keys = ('a', 'b', 'c')
+
+    def test_default(self):
+        d = dict(a=1, b=2)
+        res = extract_dict(d, self.keys)
+        assert d == dict(a=1, b=2)
+        assert res == dict(a=1, b=2, c=None)
+
+    def test_default_value(self):
+        d = dict(a=1, b=2)
+        res = extract_dict(d, self.keys, default=3)
+        assert d == dict(a=1, b=2)
+        assert res == dict(a=1, b=2, c=3)
+
+    def test_remove(self):
+        d = dict(a=1, b=2)
+        res = extract_dict(d, self.keys, remove=True)
+        assert d == {}
+        assert res == dict(a=1, b=2, c=None)
+
+    def test_raises(self):
+        d = dict(a=1, b=2)
+        with pytest.raises(KeyError):
+            extract_dict(d, self.keys, default=Exception)
+
+    def test_skip(self):
+        d = dict(a=1, b=2)
+        res = extract_dict(d, self.keys, default=SkipMissing)
+        assert d == dict(a=1, b=2)
+        assert res == dict(a=1, b=2)
