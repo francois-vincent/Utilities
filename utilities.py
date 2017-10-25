@@ -15,14 +15,14 @@ class SkipMissing(object):
     pass
 
 
-def extract_translate(map, trans, remove=False, default=None):
-    """ extract items from a dict and translate their keys
+def extract_translate(map, trans, remove=False, default=SkipMissing):
+    """ Extract items from a dict and translate their keys
     :param map: the source dict
     :param trans: the translation dict
-    :param remove: if True the field is removed from map
-    :param default: if Exception and the field is missing from map then raise,
-                    if SkipMissing and the field is missing from map then skip,
-                    else missing field is None
+    :param remove: if True the fields are removed from map
+    :param default: if 'Exception' and the key is missing from map then raise,
+                    if 'SkipMissing' and the key is missing from map then skip,
+                    else value substituted for the missing key
     :return: the extracted dict
     """
     if default is Exception:
@@ -43,14 +43,14 @@ def extract_translate(map, trans, remove=False, default=None):
         return {v: map.get(k, default) for k, v in trans.iteritems()}
 
 
-def extract_dict(map, keys, remove=False, default=None):
-    """ extract items from a dict
+def extract_dict(map, keys, remove=False, default=SkipMissing):
+    """ Extract items from a dict
     :param map: the source dict
     :param keys: the keys iterator
-    :param remove: if True the field is removed from map
-    :param default: if Exception and the field is missing from map then raise,
-                    if SkipMissing and the field is missing from map then skip,
-                    else missing field is None
+    :param remove: if True the fields are removed from map
+    :param default: if 'Exception' and the key is missing from map then raise,
+                    if 'SkipMissing' and the key is missing from map then skip,
+                    else value substituted for the missing key
     :return: the extracted dict
     """
     if default is Exception:

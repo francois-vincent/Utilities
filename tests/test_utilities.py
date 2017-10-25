@@ -31,7 +31,7 @@ class TestExtractTranslate(object):
         d = dict(a=1, b=2)
         res = extract_translate(d, self.trans)
         assert d == dict(a=1, b=2)
-        assert res == dict(A=1, B=2, C=None)
+        assert res == dict(A=1, B=2)
 
     def test_default_value(self):
         d = dict(a=1, b=2)
@@ -41,7 +41,7 @@ class TestExtractTranslate(object):
 
     def test_remove(self):
         d = dict(a=1, b=2)
-        res = extract_translate(d, self.trans, remove=True)
+        res = extract_translate(d, self.trans, remove=True, default=None)
         assert d == {}
         assert res == dict(A=1, B=2, C=None)
 
@@ -49,12 +49,6 @@ class TestExtractTranslate(object):
         d = dict(a=1, b=2)
         with pytest.raises(KeyError):
             extract_translate(d, self.trans, default=Exception)
-
-    def test_skip(self):
-        d = dict(a=1, b=2)
-        res = extract_translate(d, self.trans, default=SkipMissing)
-        assert d == dict(a=1, b=2)
-        assert res == dict(A=1, B=2)
 
 
 class TestExtractDict(object):
@@ -64,7 +58,7 @@ class TestExtractDict(object):
         d = dict(a=1, b=2)
         res = extract_dict(d, self.keys)
         assert d == dict(a=1, b=2)
-        assert res == dict(a=1, b=2, c=None)
+        assert res == dict(a=1, b=2)
 
     def test_default_value(self):
         d = dict(a=1, b=2)
@@ -74,7 +68,7 @@ class TestExtractDict(object):
 
     def test_remove(self):
         d = dict(a=1, b=2)
-        res = extract_dict(d, self.keys, remove=True)
+        res = extract_dict(d, self.keys, remove=True, default=None)
         assert d == {}
         assert res == dict(a=1, b=2, c=None)
 
@@ -82,9 +76,3 @@ class TestExtractDict(object):
         d = dict(a=1, b=2)
         with pytest.raises(KeyError):
             extract_dict(d, self.keys, default=Exception)
-
-    def test_skip(self):
-        d = dict(a=1, b=2)
-        res = extract_dict(d, self.keys, default=SkipMissing)
-        assert d == dict(a=1, b=2)
-        assert res == dict(a=1, b=2)
