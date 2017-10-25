@@ -1,7 +1,7 @@
 
 import pytest
 
-from ..utilities import extract_translate, SkipMissing
+from ..utilities import extract_translate, SkipMissing, get_accessors_for_object
 
 
 def test_default():
@@ -36,3 +36,23 @@ def test_skip():
     res = extract_translate(d, dict(a='A', b='B', c='C'), default=SkipMissing)
     assert d == dict(a=1, b=2)
     assert res == dict(A=1, B=2)
+
+
+def test_accessor_object():
+    class A(object):
+        a = 1
+    x = A()
+    get, set = get_accessors_for_object(A, x)
+    assert get('a') == 1
+    set('b', 2)
+    assert get('a') == 1
+
+
+def test_accessor_dict():
+    class A(object):
+        pass
+    x = {'a': 1}
+    get, set = get_accessors_for_object(A, x)
+    assert get('a') == 1
+    set('b', 2)
+    assert get('a') == 1

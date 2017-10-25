@@ -1,11 +1,14 @@
 
+from functools import partial
+
 
 def get_accessors_for_object(cls, obj):
     """ return standard object accessors if obj is an instance of cls
         else return dict accessors
         usefull for dict/django.models.Model dichotomy (before/after object creation)
     """
-    return (getattr, setattr) if isinstance(obj, cls) else (dict.get, dict.__setitem__)
+    return (partial(getattr, obj), partial(setattr, obj)) if isinstance(obj, cls) \
+        else (partial(dict.__getitem__, obj), partial(dict.__setitem__, obj))
 
 
 class SkipMissing(object):
