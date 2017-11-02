@@ -1,4 +1,6 @@
 
+from collections import defaultdict, Mapping
+import json
 from functools import partial
 
 
@@ -37,6 +39,11 @@ def extract_translate(map, trans, remove=False, default=SkipMissing):
             except KeyError:
                 pass
         return res
+    if isinstance(default, Mapping):
+        if remove:
+            return {v: map.pop(k, default[k]) for k, v in trans.iteritems()}
+        else:
+            return {v: map.get(k, default[k]) for k, v in trans.iteritems()}
     if remove:
         return {v: map.pop(k, default) for k, v in trans.iteritems()}
     else:
@@ -65,7 +72,31 @@ def extract_dict(map, keys, remove=False, default=SkipMissing):
             except KeyError:
                 pass
         return res
+    if isinstance(default, Mapping):
+        if remove:
+            return {k: map.pop(k, default[k]) for k in keys}
+        else:
+            return {k: map.get(k, default[k]) for k in keys}
     if remove:
         return {k: map.pop(k, default) for k in keys}
     else:
         return {k: map.get(k, default) for k in keys}
+
+
+class KeyCounter(object):
+    def __init__(self, *args):
+        self.data = defaultdict(int)
+    def record(self, cont):
+        if isinstance(cont, basestring):
+            self.data[cont] += 1
+            return
+        for k in cont:
+            self.data[k] += 1
+    def __len__(self):
+        if len(self.data):
+            return max(v for v in self.data.itervalues())
+        return 0
+    def __nonzero__(self):
+        return bool(self.data)
+    def __str__(self):
+        return json.dumps(dict(self.data), indent=4)
