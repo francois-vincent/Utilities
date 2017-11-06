@@ -24,6 +24,12 @@ def chunk_iter(iterable, chunk_size):
         yield itertools.chain((n,), itertools.islice(iterator, chunk_size - 1))
 
 
+def first(iterable, condition, default=None):
+    """ return the first element in an iterable that satisfies the condition
+    """
+    return next((x for x in iterable if condition(x)), default)
+
+
 if __name__ == '__main__':
     for i in close_product((0, 1, 2, 3), (0, 1), (0, 1)):
         print(i)
@@ -34,3 +40,6 @@ if __name__ == '__main__':
         print(tuple(x))
 
     assert tuple(''.join(x) for x in chunk_iter('abcdefghij', 3)) == ('abc', 'def', 'ghi', 'j')
+
+    assert first(xrange(5), lambda x: x > 3) == 4
+    assert first(xrange(5), lambda x: x > 4) is None
