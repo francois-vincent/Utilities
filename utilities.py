@@ -22,9 +22,9 @@ def extract_translate(map, trans, remove=False, default=SkipMissing):
     :param map: the source dict
     :param trans: the translation dict
     :param remove: if True the fields are removed from map
-    :param default: if 'Exception' and the key is missing from map then raise,
-                    if 'SkipMissing' and the key is missing from map then skip,
-                    else value substituted for the missing key
+    :param default: what to do if key is missing from map:
+                    if 'Exception' then raise, if 'SkipMissing' then skip,
+                    else value substituted for the missing key (single value or dict)
     :return: the extracted dict
     """
     if default is Exception:
@@ -39,15 +39,10 @@ def extract_translate(map, trans, remove=False, default=SkipMissing):
             except KeyError:
                 pass
         return res
+    get = map.pop if remove else map.get
     if isinstance(default, Mapping):
-        if remove:
-            return {v: map.pop(k, default[k]) for k, v in trans.iteritems()}
-        else:
-            return {v: map.get(k, default[k]) for k, v in trans.iteritems()}
-    if remove:
-        return {v: map.pop(k, default) for k, v in trans.iteritems()}
-    else:
-        return {v: map.get(k, default) for k, v in trans.iteritems()}
+        return {v: get(k, default[k]) for k, v in trans.iteritems()}
+    return {v: get(k, default) for k, v in trans.iteritems()}
 
 
 def extract_dict(map, keys, remove=False, default=SkipMissing):
@@ -55,9 +50,9 @@ def extract_dict(map, keys, remove=False, default=SkipMissing):
     :param map: the source dict
     :param keys: the keys iterator
     :param remove: if True the fields are removed from map
-    :param default: if 'Exception' and the key is missing from map then raise,
-                    if 'SkipMissing' and the key is missing from map then skip,
-                    else value substituted for the missing key
+    :param default: what to do if key is missing from map:
+                    if 'Exception' then raise, if 'SkipMissing' then skip,
+                    else value substituted for the missing key (single value or dict)
     :return: the extracted dict
     """
     if default is Exception:
@@ -72,15 +67,10 @@ def extract_dict(map, keys, remove=False, default=SkipMissing):
             except KeyError:
                 pass
         return res
+    get = map.pop if remove else map.get
     if isinstance(default, Mapping):
-        if remove:
-            return {k: map.pop(k, default[k]) for k in keys}
-        else:
-            return {k: map.get(k, default[k]) for k in keys}
-    if remove:
-        return {k: map.pop(k, default) for k in keys}
-    else:
-        return {k: map.get(k, default) for k in keys}
+        return {k: get(k, default[k]) for k in keys}
+    return {k: get(k, default) for k in keys}
 
 
 class KeyCounter(object):
