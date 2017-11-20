@@ -73,6 +73,25 @@ def extract_dict(map, keys, remove=False, default=SkipMissing):
     return {k: get(k, default) for k in keys}
 
 
+def update_filter(dest, src, keys, force=False):
+    """
+    copy keys from a source mapping to a destination mapping
+    :param dest:
+    :param src:
+    :param keys: an iterable of keys to copy
+    :param force: if True all keys are replaced in dest else,
+      only keys existing in source are repaced in dest
+    :return: the destination mapping
+    """
+    if src or force:
+        for key in keys:
+            if force:
+                dest[key] = src.get(key)
+            elif key in src:
+                dest[key] = src[key]
+    return dest
+
+
 class KeyCounter(object):
     def __init__(self, *args):
         self.data = defaultdict(int)
