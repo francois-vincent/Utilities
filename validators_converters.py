@@ -1,5 +1,5 @@
-# Copyright 2017 Kosc Telecom
 
+import re
 import socket
 
 
@@ -11,3 +11,8 @@ def valid_ipv4(address):
         return True
     except:
         return False
+
+
+def convert_camelcase(name):
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()

@@ -1,4 +1,4 @@
-# Copyright 2017 Kosc Telecom
+# https://python-gtk-3-tutorial.readthedocs.io/en/latest/index.html
 
 import gi
 gi.require_version('Gtk', '3.0')

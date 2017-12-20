@@ -1,7 +1,8 @@
 
 import pytest
 
-from ..utilities import extract_translate, extract_dict, SkipMissing, get_accessors_for_object
+from ..utilities import extract_translate, extract_dict, get_accessors_for_object
+from ..validators_converters import convert_camelcase
 
 
 def test_accessor_object():
@@ -76,3 +77,11 @@ class TestExtractDict(object):
         d = dict(a=1, b=2)
         with pytest.raises(KeyError):
             extract_dict(d, self.keys, default=Exception)
+
+
+class TestConverters(object):
+
+    def test_convert_camelcase(self):
+        assert convert_camelcase('CamelCase') == 'camel_case'
+        assert convert_camelcase('LongCamelCase') == 'long_camel_case'
+        assert convert_camelcase('CamelCaseTBD') == 'camel_case_tbd'
