@@ -2,7 +2,7 @@
 import pytest
 
 from ..utilities import extract_translate, extract_dict, get_accessors_for_object
-from ..validators_converters import convert_camelcase
+from ..converters_validators import convert_camelcase, clean_printables
 
 
 def test_accessor_object():
@@ -85,3 +85,10 @@ class TestConverters(object):
         assert convert_camelcase('CamelCase') == 'camel_case'
         assert convert_camelcase('LongCamelCase') == 'long_camel_case'
         assert convert_camelcase('CamelCaseTBD') == 'camel_case_tbd'
+
+    def test_clean_printables(self):
+        printables = ''.join(chr(x) for x in xrange(32, 127))
+        non_asciis = ''.join(chr(x) for x in xrange(256))
+        assert clean_printables(non_asciis) == printables
+        assert clean_printables('\x1f') == ''
+        assert clean_printables('\x7f') == ''
