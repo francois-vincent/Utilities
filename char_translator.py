@@ -53,5 +53,5 @@ CHAR_TRANSLATOR = {
 
 if __name__ == '__main__':
     print("Aix-en-Provence".translate(CHAR_TRANSLATOR))
-    print("#François.Huré".translate(CHAR_TRANSLATOR))
+    print("#François.Bébé".translate(CHAR_TRANSLATOR))
     print("Gœthe Mælstrom".translate(CHAR_TRANSLATOR))
