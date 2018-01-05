@@ -1,3 +1,2 @@
-Fix memoize for methods
-Add a module for most common regex operations (match smth, extract smth)
+Add a module for most common regexp operations (match smth, extract smth)
 Design a good retrier
