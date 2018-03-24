@@ -24,6 +24,15 @@ def chunk_iter(iterable, chunk_size):
         yield itertools.chain((n,), itertools.islice(iterator, chunk_size - 1))
 
 
+def grouper(iterable, n, fillvalue=None):
+    """ group data into fixed-length chunks or blocks
+        grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
+        better than chunk_iter
+    """
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(*args, fillvalue=fillvalue)
+
+
 def first(iterable, condition, default=None):
     """ return the first element in an iterable that satisfies the condition
     """
