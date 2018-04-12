@@ -69,18 +69,17 @@ def extract_dict(map, keys, remove=False, default=SkipMissing):
         return res
     get = map.pop if remove else map.get
     if isinstance(default, Mapping):
-        return {k: get(k, default[k]) for k in keys}
+        return {k: get(k, default.get(k)) for k in keys}
     return {k: get(k, default) for k in keys}
 
 
-def update_filter(dest, src, keys, force=False):
-    """
-    copy keys from a source mapping to a destination mapping
-    :param dest:
+def update_filter(src, dest, keys, force=False):
+    """ Copy keys from a source mapping to a destination mapping
     :param src:
+    :param dest:
     :param keys: an iterable of keys to copy
     :param force: if True all keys are replaced in dest else,
-      only keys existing in source are repaced in dest
+      only keys existing in source are replaced in dest
     :return: the destination mapping
     """
     if src or force:

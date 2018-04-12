@@ -3,9 +3,31 @@ import codecs
 from itertools import count
 
 
+def files_equal(file1, file2):
+    """ Compare 2 files by content
+    :return: True if files are equal
+    """
+    with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
+        while True:
+            data1 = f1.read(4096)
+            data2 = f2.read(4096)
+            if data1 != data2:
+                return False
+            if not (data1 and data2):
+                return True
+
+
 def file_line_count(path):
     with open(path) as f:
         return sum(1 for _ in f)
+
+
+def file_line_count_alt(path):
+    # maybe faster
+    count = 0
+    with open(path, 'rb') as f:
+        count += f.read(4096).count('\n')
+    return count
 
 
 def read_csv(file_path, skip=1, limit=None, sep=';', strip=None, codec=None, filter=None):
