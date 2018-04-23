@@ -2,6 +2,8 @@
 
 import itertools
 
+from containers import CyclicRemovable
+
 
 def close_product(*sequences):
     """ returns a sequence over the cartesian product of parameter sequences but,
@@ -19,7 +21,7 @@ def close_product(*sequences):
 def chunk_iter(iterable, chunk_size):
     """ group data into fixed-length chunks or blocks
         chunk_iter('ABCDEFG', 3) --> ABC DEF G
-        returns an iterator of iterator
+        returns an iterator of iterators, last is always truncated
     """
     assert chunk_size > 1
     iterator = iter(iterable)
@@ -32,10 +34,29 @@ def grouper(iterable, chunk_size, fillvalue=None):
     """ group data into fixed-length chunks or blocks
         grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
         returns an iterator of tuples
-        chunk_iter will truncate last chunk, grouper will fill it to chunk_size
     """
-    args = [iter(iterable)] * chunk_size
-    return itertools.izip_longest(*args, fillvalue=fillvalue)
+    iterators = [iter(iterable)] * chunk_size  # a list of copies of a single iterator
+    return itertools.izip_longest(*iterators, fillvalue=fillvalue)
+
+
+def cyclic(iterable):
+    """ like itertools.cycle except than values are not memorized
+    """
+    while True:
+        for x in iterable:
+            yield x
+
+
+def flat_mix(*iterables):
+    """ returns a cyclic iterator over elements in iterables in iteration order
+        flat_mix('ABC', 'xy', '123') --> Ax1By2C3
+    """
+    cr = CyclicRemovable(iterables, iterator=True)
+    for it in cr:
+        try:
+            yield next(it[1])
+        except StopIteration:
+            cr.remove(it[0])
 
 
 def first(iterable, condition, default=None):
@@ -50,10 +71,7 @@ if __name__ == '__main__':
     for i in close_product(('a', 'b', 'c', 'd'), ('a', 'b'), ('a', 'b')):
         print(i)
 
-    for x in chunk_iter(xrange(10), 3):
-        print(tuple(x))
-
     assert tuple(''.join(x) for x in chunk_iter('abcdefghij', 3)) == ('abc', 'def', 'ghi', 'j')
 
     assert first(xrange(5), lambda x: x > 3) == 4
-    assert first(xrange(5), lambda x: x > 4) is None
+    assert first(xrange(5), lambda x: x > 4, 'nope') is 'nope'
