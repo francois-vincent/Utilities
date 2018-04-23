@@ -41,9 +41,11 @@ def read_csv(file_path, skip=1, limit=None, sep=';', strip=None, codec=None, fil
         requires that a sep is specified.
         e.g. filter=(3, str.startswith, '45') will filter on 4th field starting with '45'
     """
+    if filter and not sep:
+        raise RuntimeError("You must specify a separator if you want a filter")
     with codecs.getreader(codec)(open(file_path, 'rb')) if codec else open(file_path) as f:
         if filter:
-            filter_indice, filter_func, filter_value = filter
+            filter_index, filter_func, filter_value = filter
         for _ in xrange(skip):
             if not f.readline().strip():
                 return
@@ -53,5 +55,5 @@ def read_csv(file_path, skip=1, limit=None, sep=';', strip=None, codec=None, fil
                 break
             if sep:
                 data = data.split(sep)
-            if not filter or filter_func(data[filter_indice], filter_value):
+            if not filter or filter_func(data[filter_index], filter_value):
                 yield [d.strip() for d in data] if strip else data

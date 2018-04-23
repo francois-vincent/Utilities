@@ -17,6 +17,10 @@ def close_product(*sequences):
 
 
 def chunk_iter(iterable, chunk_size):
+    """ group data into fixed-length chunks or blocks
+        chunk_iter('ABCDEFG', 3) --> ABC DEF G
+        returns an iterator of iterator
+    """
     assert chunk_size > 1
     iterator = iter(iterable)
     while True:
@@ -24,12 +28,13 @@ def chunk_iter(iterable, chunk_size):
         yield itertools.chain((n,), itertools.islice(iterator, chunk_size - 1))
 
 
-def grouper(iterable, n, fillvalue=None):
+def grouper(iterable, chunk_size, fillvalue=None):
     """ group data into fixed-length chunks or blocks
         grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
-        better than chunk_iter
+        returns an iterator of tuples
+        chunk_iter will truncate last chunk, grouper will fill it to chunk_size
     """
-    args = [iter(iterable)] * n
+    args = [iter(iterable)] * chunk_size
     return itertools.izip_longest(*args, fillvalue=fillvalue)
 
 
