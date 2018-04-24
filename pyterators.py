@@ -2,7 +2,11 @@
 
 import itertools
 
-from containers import CyclicRemovable
+from cyclic_iterator import CyclicRemovable
+
+"""
+Mix of various iterator tools
+"""
 
 
 def close_product(*sequences):
@@ -45,18 +49,6 @@ def cyclic(iterable):
     while True:
         for x in iterable:
             yield x
-
-
-def flat_mix(*iterables):
-    """ returns a cyclic iterator over elements in iterables in iteration order
-        flat_mix('ABC', 'xy', '123') --> Ax1By2C3
-    """
-    cr = CyclicRemovable(iterables, iterator=True)
-    for it in cr:
-        try:
-            yield next(it[1])
-        except StopIteration:
-            cr.remove(it[0])
 
 
 def first(iterable, condition, default=None):

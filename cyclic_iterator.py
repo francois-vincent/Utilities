@@ -12,16 +12,19 @@ class CyclicRemovable(object):
     class Dropped(object):
         pass
 
-    def __init__(self, iterable, iterator=False, debug=False):
+    def __init__(self, iterable, debug=False):
         self.index = 0
-        if iterator:
-            self.elements = list(iter(it) for it in iterable)
-        else:
-            self.elements = list(iterable)
+        self.elements = list(iterable)
         self.length = len(self.elements)
         self.indexes = range(1, self.length)  # list of indexes of next element
         self.indexes.append(0)
         self.debug = debug
+
+    @classmethod
+    def make_iterators(cls, iterable, debug=False):
+        """ constructor that makes iterators from iterable
+        """
+        return cls((iter(it) for it in iterable), debug)
 
     def remove(self, index):
         if self.debug:
@@ -65,17 +68,29 @@ class CyclicRemovable(object):
             return index, element
         raise StopIteration()
 
+    @classmethod
+    def flat_mix(cls, *iterables):
+        """ implements a cyclic generator over elements in iterables in iteration order
+            flat_mix('ABC', 'xy', '123') --> Ax1By2C3
+        """
+        cr = cls.make_iterators(iterables)
+        for it in cr:
+            try:
+                yield next(it[1])
+            except StopIteration:
+                cr.remove(it[0])
+
 
 if __name__ == '__main__':
     cr = CyclicRemovable('ABCDE', debug=True)
+    cr.remove(0)
+    cr.remove(2)
+    cr.remove(4)
     for i, x in enumerate(cr):
         print(i, x)
-        if i == 1:
+        if i == 3:
             cr.remove(1)
         if i == 5:
             cr.remove(3)
-        if i == 6:
-            cr.remove(2)
-            cr.remove(4)
-        if i == 9:
-            cr.remove(0)
+    print()
+    print(list(CyclicRemovable.flat_mix('ABC', 'xy', '123')))
