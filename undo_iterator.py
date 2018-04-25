@@ -8,36 +8,40 @@ class UndoIterator(object):
         with an optional back depth
     """
     def __init__(self, iterator, depth=5):
-        self.iterator = iterator
-        self.queue = deque(maxlen=depth+1) if depth > 0 else []
-        self.back_queue = []
+        self._iterator = iterator
+        self._queue = deque(maxlen=depth+1) if depth > 0 else []
+        self._back_queue = []
+        self._lock_repeat = False  # control consecutive executions of repeat()
         self.index = 0  # simulate enumerate() on the go
 
     def __iter__(self):
         return self
 
     def next(self):
-        elt = self.back_queue.pop() if self.back_queue else next(self.iterator)
-        self.queue.append(elt)
+        self._lock_repeat = False
+        elt = self._back_queue.pop() if self._back_queue else next(self._iterator)
+        self._queue.append(elt)
         self.index += 1
         return elt
 
     def repeat(self):
-        self.back_queue.append(self.queue.pop())
-        self.index -= 1
+        if not self._lock_repeat:
+            self._lock_repeat = True
+            self._back_queue.append(self._queue.pop())
+            self.index -= 1
 
     def prev(self):
         self.repeat()
-        elt = self.queue.pop()
-        self.back_queue.append(elt)
+        elt = self._queue.pop()
+        self._back_queue.append(elt)
         self.index -= 1
         return elt
 
     def can_undo(self):
-        return len(self.queue) > 1
+        return len(self._queue) > 1
 
     def cur(self):
-        return self.queue[-1]
+        return self._queue[-1]
 
 
 if __name__ == '__main__':
