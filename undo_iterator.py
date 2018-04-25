@@ -7,12 +7,11 @@ class UndoIterator(object):
     """ wraps a plain iterator to offer a two way iterator
         with an optional back depth
     """
-
     def __init__(self, iterator, depth=5):
         self.iterator = iterator
-        self.queue = deque(maxlen=depth+1) if depth > 0 else deque()
+        self.queue = deque(maxlen=depth+1) if depth > 0 else []
         self.back_queue = []
-        self.index = -1
+        self.index = 0  # simulate enumerate() on the go
 
     def __iter__(self):
         return self
@@ -23,17 +22,19 @@ class UndoIterator(object):
         self.index += 1
         return elt
 
+    def repeat(self):
+        self.back_queue.append(self.queue.pop())
+        self.index -= 1
+
     def prev(self):
-        if not self.back_queue:
-            self.repeat()
+        self.repeat()
         elt = self.queue.pop()
         self.back_queue.append(elt)
         self.index -= 1
         return elt
 
-    def repeat(self):
-        self.back_queue.append(self.queue.pop())
-        self.index -= 1
+    def can_undo(self):
+        return len(self.queue) > 1
 
     def cur(self):
         return self.queue[-1]
