@@ -1,3 +1,7 @@
+refactor for bicompatibility py2/3 with future and six
+
 Add a module for most common regexp operations (match, search, extract, replace)
 
 Add a module with common postgresql commands (truncate, resynchro id counter, etc...)
+
+terminate histodict or remove

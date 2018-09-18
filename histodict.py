@@ -5,7 +5,7 @@ from collections import deque
 
 class hdict(dict):
     # Fixme: specify first
-    """ hdict (history dict) is a kinnd of immutable dict that preserves its history
+    """ hdict (history dict) is a kind of immutable dict that preserves its history.
         history is stored in a deque
     """
     def __init__(self, *args, **kwargs):

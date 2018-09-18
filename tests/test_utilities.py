@@ -1,7 +1,7 @@
 
 import pytest
 
-from ..utilities import extract_translate, extract_dict, get_accessors_for_object
+from ..dict_utilities import extract_translate, extract_dict, get_accessors_for_object
 from ..converters_validators import convert_camelcase, clean_printables
 
 
