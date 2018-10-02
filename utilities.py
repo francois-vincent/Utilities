@@ -1,7 +1,21 @@
 
 import random
 import re
-from six.moves import range
+
+
+try:
+  basestring
+except NameError:
+  basestring = str
+
+try:
+  xrange
+except NameError:
+  xrange = range
+
+
+def isstring(x):
+    return isinstance(x, basestring)
 
 
 UUID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -12,7 +26,7 @@ NUMBER_CLEANER_RE = re.compile(r"\D+")
 def make_id_with_prefix(prefix='', length=8, with_uppercase=False):
     """Make a new id by joining randomly picked chars from alphabet"""
     alphabet = UUID_ALPHABET_WITH_UPPERCASE if with_uppercase else UUID_ALPHABET
-    rs = ''.join(random.choice(alphabet) for _ in range(length))
+    rs = ''.join(random.choice(alphabet) for _ in xrange(length))
     return prefix + '_' + rs if prefix else rs
 
 
