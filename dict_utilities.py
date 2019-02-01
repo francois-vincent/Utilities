@@ -108,3 +108,43 @@ class KeyCounter(object):
         return bool(self.data)
     def __str__(self):
         return json.dumps(dict(self.data), indent=4)
+
+
+class MissingRaises:
+    pass
+
+
+class BijectionMapper(dict):
+    """ A dictionary class with an attribute-like access and a reverse mapping
+        Fails and raises if any key or value is duplicated (bijection)
+    """
+
+    def __init__(self, *map):
+        self.map = map
+        dict.__init__(self, map)
+        if len(self) != len(map):
+            raise KeyError("Duplicated keys")
+        self.backward = dict((v, k) for k, v in map)
+        if len(self.backward) != len(map):
+            raise ValueError("Duplicated values")
+
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(key)
+
+    def from_value(self, value, default=MissingRaises):
+        if default is MissingRaises:
+            return self.backward[value]
+        return self.backward.get(value, default)
+
+    def has_value(self, value):
+        return value in self.backward
+
+    def from_value_or_key(self, item):
+        try:
+            return self.from_value(item)
+        except KeyError:
+            self[item]
+            return item
