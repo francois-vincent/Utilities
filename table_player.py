@@ -51,16 +51,12 @@ class Filter:
         :param value: a value to compare
         :return: the equivalent sql expression
         """
-        def quote(param):
-            if isinstance(param, (int, float)):
-                return str(param)
-            return repr(param)
         if '__' in key:
             key, op = key.split('__')
-            if len(value) == 1 and op == 'in':
-                return key + '=' + quote(value[0])
-            return key + cls.tr_sql[op] % (value,)
-        return key + '=' + quote(value)
+            if op != 'in' or len(value) > 1:
+                return key + cls.tr_sql[op] % (value,)
+            value = value[0]
+        return key + '=' + repr(value)
 
 
 class TableContainer:
