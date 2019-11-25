@@ -21,11 +21,24 @@ class Condition:
         self.ope = ope
         self.val = val
         self.meta = meta  # builtin any or all
+        self.chain_or, self.chain_and = None, None
+
+    def __or__(self, other):
+        self.chain_or = other
+
+    def __and__(self, other):
+        self.chain_and = other
 
     def __call__(self, s):
         if self.meta:
-            return self.meta(self.ope(x, self.val) for x in deep_struct_iter(s, self.path))
-        return self.ope(next(deep_struct_get(s, self.path)), self.val)
+            val = self.meta(self.ope(x, self.val) for x in deep_struct_iter(s, self.path))
+        else:
+            val = self.ope(next(deep_struct_get(s, self.path)), self.val)
+        if self.chain_and and val:
+            return self.chain_and(s)
+        if self.chain_or and not val:
+            return self.chain_or(s)
+        return val
 
 
 def deep_struct_get(s, path):
@@ -34,7 +47,7 @@ def deep_struct_get(s, path):
         return
     head, tail = get_head_tail(path)
     if head == '#':
-        raise ValueError('# not allowed in deep_struct_get')
+        raise ValueError("'#' not allowed in deep_struct_get")
     elif head.isdigit():
         assert isinstance(s, list)
         yield from deep_struct_get(s[int(head)], tail)

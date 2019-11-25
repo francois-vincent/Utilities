@@ -61,12 +61,17 @@ class TestStructConstruct:
 class CycleFactory:
     manu = cycle(('toto', 'titi'))
     slug = cycle(('sw', 'ap'))
+    cnt = 0
     @classmethod
     def key(cls, sub):
         if sub == 'manufacturer':
             return next(cls.manu)
         if sub == 'slug':
             return next(cls.slug)
+        if sub == 'name':
+            val = 'name_' + str(cls.cnt)
+            cls.cnt += 1
+            return val
 
 
 class TestStructExtract:
@@ -98,3 +103,12 @@ class TestStructExtract:
         assert deep_struct_collect(struct, 'results.#.model',
                                    'manufacturer',
                                    Condition('tags.#.slug', ope.eq, 'ap', all)) == ['titi']
+
+    def test_conditional_extract_and(self):
+        spec = 'results.[2].model.tags,name,manufacturer.[2].slug'
+        struct = DeepStruct(CycleFactory, list_index=1).construct(spec)
+        data = deep_struct_collect(struct, 'results.#.model',
+                                   'name',
+                                   Condition('tags.#.slug', ope.eq, 'ap', any) and
+                                   Condition('manufacturer', ope.eq, 'titi'))
+        assert data == ['name_1']
