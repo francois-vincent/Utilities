@@ -1,4 +1,6 @@
 import functools
+
+from django.core.exceptions import ValidationError
 from django.db import connection, models
 
 from .utilities import make_id_with_prefix
@@ -19,10 +21,55 @@ class UIDField(models.Field):
         return name, 'models.CharField', args, kwargs
 
 
+class ListCharField(models.CharField):
+    """ Auto truncating CharField that drops on the left side
+    """
+
+    def __init__(self, sep=':', **kwargs):
+        self.sep = sep
+        kwargs['default'] = ''
+        super().__init__(**kwargs)
+
+    def get_prep_value(self, value):
+        value = super().get_prep_value(value)
+        if value and len(value) > self.max_length:
+            index = value.find(self.sep, len(value) - self.max_length)
+            if index > -1:
+                return value[index+1:]
+            raise ValidationError("max length exceeded", code='max_length')
+        return value
+
+
 def custom_sql(sql, *args):
     with connection.cursor() as cursor:
         cursor.execute(sql, args)
         return cursor.fetchall()
+
+
+def make_condition(field, value_s, coord='AND'):
+    """ build a WHERE sql condition in the general form:
+        < COORD field IN (value_s)> if value_s is a sequence
+        < COORD field=value_s> if value_s is a single value (string, integer or boolean)
+    :param field: field name
+    :param value_s: a single value or a sequence
+    :param coord: 'AND', 'OR' or None
+    :return: (string) empty if value_s is None or an empty sequence
+    """
+    def prep_coord(cond, coord):
+        if coord:
+            return ' ' + coord + ' ' + cond
+        return cond
+
+    if not value_s and value_s not in (0, False):
+        return ''
+    if isinstance(value_s, (tuple, list, set)):
+        if not isinstance(value_s, tuple):
+            value_s = tuple(value_s)
+        if len(value_s) == 1:
+            value_s = value_s[0]
+        else:
+            return prep_coord("%s IN %s" % (field, value_s), coord)
+    return prep_coord("%s=%r" % (field, value_s), coord)
 
 
 def quote(param):

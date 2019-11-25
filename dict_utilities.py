@@ -5,9 +5,9 @@ from functools import partial
 
 
 def get_accessors_for_object(cls, obj):
-    """ return standard object accessors if obj is an instance of cls
+    """ return standard object accessors (get, set) if obj is an instance of cls
         else return dict accessors
-        usefull for dict/django.models.Model dichotomy (before/after object creation)
+        useful for dict/django.models.Model dichotomy (before/after object creation)
     """
     return (partial(getattr, obj), partial(setattr, obj)) if isinstance(obj, cls) \
         else (partial(dict.__getitem__, obj), partial(dict.__setitem__, obj))
@@ -29,11 +29,11 @@ def extract_translate(map, trans, remove=False, default=SkipMissing):
     """
     if default is Exception:
         get = map.pop if remove else map.__getitem__
-        return {v: get(k) for k, v in trans.iteritems()}
+        return {v: get(k) for k, v in trans.items()}
     if default is SkipMissing:
         get = map.pop if remove else map.__getitem__
         res = {}
-        for k, v in trans.iteritems():
+        for k, v in trans.items():
             try:
                 res[v] = get(k)
             except KeyError:
@@ -41,8 +41,8 @@ def extract_translate(map, trans, remove=False, default=SkipMissing):
         return res
     get = map.pop if remove else map.get
     if isinstance(default, Mapping):
-        return {v: get(k, default[k]) for k, v in trans.iteritems()}
-    return {v: get(k, default) for k, v in trans.iteritems()}
+        return {v: get(k, default[k]) for k, v in trans.items()}
+    return {v: get(k, default) for k, v in trans.items()}
 
 
 def extract_dict(map, keys, remove=False, default=SkipMissing):
@@ -95,14 +95,14 @@ class KeyCounter(object):
     def __init__(self, *args):
         self.data = defaultdict(int)
     def record(self, cont):
-        if isinstance(cont, basestring):
+        if isinstance(cont, str):
             self.data[cont] += 1
             return
         for k in cont:
             self.data[k] += 1
     def __len__(self):
         if len(self.data):
-            return max(v for v in self.data.itervalues())
+            return max(v for v in self.data.values())
         return 0
     def __nonzero__(self):
         return bool(self.data)
@@ -119,13 +119,13 @@ class BijectionMapper(dict):
         Fails and raises if any key or value is duplicated (bijection)
     """
 
-    def __init__(self, *map):
-        self.map = map
-        dict.__init__(self, map)
-        if len(self) != len(map):
+    def __init__(self, *pairs):
+        self.pairs = pairs
+        dict.__init__(self, pairs)
+        if len(self) != len(pairs):
             raise KeyError("Duplicated keys")
-        self.backward = dict((v, k) for k, v in map)
-        if len(self.backward) != len(map):
+        self.backward = dict((v, k) for k, v in pairs)
+        if len(self.backward) != len(pairs):
             raise ValueError("Duplicated values")
 
     def __getattr__(self, key):
@@ -133,6 +133,22 @@ class BijectionMapper(dict):
             return self[key]
         except KeyError:
             raise AttributeError(key)
+
+    @property
+    def reversed_pairs(self):
+        return tuple((v, k) for k, v in self.pairs)
+
+    @property
+    def for_echoices(self):
+        return tuple((k, v, k.lower()) for k, v in self.pairs)
+
+    @property
+    def ordered_keys(self):
+        return tuple(k for k, v in self.pairs)
+
+    @property
+    def ordered_values(self):
+        return tuple(v for k, v in self.pairs)
 
     def from_value(self, value, default=MissingRaises):
         if default is MissingRaises:
@@ -143,8 +159,25 @@ class BijectionMapper(dict):
         return value in self.backward
 
     def from_value_or_key(self, item):
+        """
+        returns a key from a value
+        if not found, check if item is a key and returns it unchanged
+        :param item: a value or a key
+        """
         try:
-            return self.from_value(item)
+            return self.backward[item]
         except KeyError:
             self[item]
+            return item
+
+    def from_key_or_value(self, item):
+        """
+        returns a value from a key
+        if not found, check if item is a value and returns it unchanged
+        :param item: a key or a value
+        """
+        try:
+            return self[item]
+        except KeyError:
+            self.backward[item]
             return item
