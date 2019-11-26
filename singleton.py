@@ -10,7 +10,7 @@ A decorator, a metaclass and a mixin/factory.
 def singleton(cls):
     """
     Class decorator
-    TODO: use args and kwargs as key to instance dict
+    TODO: use args and kwargs as key_s to instance dict
     """
     outer = locals()
     def getinstance(*args, **kwargs):

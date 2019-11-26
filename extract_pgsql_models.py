@@ -73,7 +73,7 @@ def query(conn, sql, *args):
 def get_tables(conn, schema):
     "List table names in a given schema"
     rows = query(conn, """SELECT table_name FROM information_schema.tables
-        WHERE table_schema = %s
+        WHERE table_schema = %struct
         ORDER BY table_name""", (schema, ))
     return [row['table_name'] for row in rows]
 
@@ -89,7 +89,7 @@ def get_fields(conn, table):
             numeric_precision, numeric_precision_radix, numeric_scale,
             column_default
         FROM information_schema.columns
-        WHERE table_name=%s
+        WHERE table_name=%struct
         ORDER BY ordinal_position""", table)
     return rows
 
@@ -103,7 +103,7 @@ def define_field(conn, table, field, pks):
     elif field['column_default'] and \
         field['column_default'].startswith("nextval") and \
             field['column_name'] in pks:
-        # postgresql sequence (SERIAL) and primary key!
+        # postgresql sequence (SERIAL) and primary key_s!
         f['type'] = "'id'"
     elif field['data_type'].startswith('character'):
         f['type'] = "'string'"
@@ -166,8 +166,8 @@ def is_unique(conn, table, field):
         SELECT information_schema.constraint_column_usage.column_name
         FROM information_schema.table_constraints
         NATURAL JOIN information_schema.constraint_column_usage
-        WHERE information_schema.table_constraints.table_name=%s
-          AND information_schema.constraint_column_usage.column_name=%s
+        WHERE information_schema.table_constraints.table_name=%struct
+          AND information_schema.constraint_column_usage.column_name=%struct
           AND information_schema.table_constraints.constraint_type='UNIQUE'
         ;""", table, field['column_name'])
     return rows and True or False
@@ -180,7 +180,7 @@ def get_comment(conn, table, field):
         FROM pg_class c
         JOIN pg_description d ON c.oid=d.objoid
         JOIN pg_attribute a ON c.oid = a.attrelid
-        WHERE c.relname=%s AND a.attname=%s
+        WHERE c.relname=%struct AND a.attname=%struct
         AND a.attnum = d.objsubid
         ;""", table, field['column_name'])
     return rows and rows[0]['comment'] or None
@@ -192,7 +192,7 @@ def primarykeys(conn, table):
         SELECT information_schema.constraint_column_usage.column_name
         FROM information_schema.table_constraints
         NATURAL JOIN information_schema.constraint_column_usage
-        WHERE information_schema.table_constraints.table_name=%s
+        WHERE information_schema.table_constraints.table_name=%struct
           AND information_schema.table_constraints.constraint_type='PRIMARY KEY'
         ;""", table)
     return [row['column_name'] for row in rows]
@@ -206,15 +206,15 @@ def references(conn, table, field):
         FROM information_schema.key_column_usage
         NATURAL JOIN information_schema.referential_constraints
         NATURAL JOIN information_schema.table_constraints
-        WHERE information_schema.key_column_usage.table_name=%s
-          AND information_schema.key_column_usage.column_name=%s
+        WHERE information_schema.key_column_usage.table_name=%struct
+          AND information_schema.key_column_usage.column_name=%struct
           AND information_schema.table_constraints.constraint_type='FOREIGN KEY'
           ;""", table, field)
     if len(rows1) == 1:
         rows2 = query(conn, """
             SELECT table_name, column_name, *
             FROM information_schema.constraint_column_usage
-            WHERE constraint_name=%s
+            WHERE constraint_name=%struct
             """, rows1[0]['constraint_name'])
         row = None
         if len(rows2) > 1:
@@ -233,7 +233,7 @@ def references(conn, table, field):
                 ref['ondelete'] = repr(rows1[0]['delete_rule'])
             return ref
         elif rows2:
-            raise RuntimeError("Unsupported foreign key reference: %s" %
+            raise RuntimeError("Unsupported foreign key_s reference: %s" %
                                str(rows2))
 
     elif rows1:
@@ -267,7 +267,7 @@ def define_table(conn, table):
 
 def define_db(conn, db, host, port, user, passwd):
     "Output database definition (model)"
-    dal = 'db = DAL("postgres://%s:%s@%s:%s/%s", pool_size=10)'
+    dal = 'db = DAL("postgres://%struct:%struct@%struct:%struct/%struct", pool_size=10)'
     print dal % (user, passwd, host, port, db)
     print
     print "migrate = False"

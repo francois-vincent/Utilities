@@ -1,4 +1,5 @@
 
+from collections import Counter
 from itertools import cycle
 import operator as ope
 
@@ -74,6 +75,15 @@ class CycleFactory:
             return val
 
 
+class CountingFactory:
+    cnt = Counter()
+    @classmethod
+    def key(cls, sub):
+        cnt = cls.cnt[sub]
+        cls.cnt[sub] = cnt + 1
+        return sub + '_' + str(cnt)
+
+
 class TestStructExtract:
 
     def test_simple_extract(self):
@@ -112,3 +122,8 @@ class TestStructExtract:
                                    Condition('tags.#.slug', ope.eq, 'ap', any) and
                                    Condition('manufacturer', ope.eq, 'titi'))
         assert data == ['name_1']
+
+    def test_multiple_extract(self):
+        struct = DeepStruct(CountingFactory, list_index=1).construct('results.[2].model.manu,tags')
+        assert deep_struct_collect(struct, 'results.#.model', 'manu,tags') == [('manu_0', 'tags_0'),
+                                                                               ('manu_1', 'tags_1')]

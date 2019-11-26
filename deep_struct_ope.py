@@ -25,9 +25,11 @@ class Condition:
 
     def __or__(self, other):
         self.chain_or = other
+        return self
 
     def __and__(self, other):
         self.chain_and = other
+        return self
 
     def __call__(self, s):
         if self.meta:
@@ -75,19 +77,22 @@ def deep_struct_iter(s, path):
         yield from call(s[head], tail)
 
 
-def deep_struct_collect(s, path, key, cond=None):
+def deep_struct_collect(struct, path, key_s, cond=None):
     """ extract data from a deeply nested structure (dict/list)
-    :param s: a nested dict/list structure
+    :param struct: a nested dict/list structure
     :param path: a dotted notation path in the structure (eg key.index.key.#.key)
            where key is a dict key, index is a list index (integer), and # stands for list iterator
-    :param key: the key to extract
+    :param key_s: the key to extract, or a comma separated list of keys
     :param cond: the (optional) condition to extract the key: instance of Condition
     :return: a list of extracted data
     """
     result = []
-    for sub in deep_struct_iter(s, path):
+    for sub in deep_struct_iter(struct, path):
         if cond(sub) if cond else True:
-            result.append(next(deep_struct_get(sub, key)))
+            if ',' in key_s:
+                result.append(tuple(next(deep_struct_get(sub, key)) for key in key_s.split(',')))
+            else:
+                result.append(next(deep_struct_get(sub, key_s)))
     return result
 
 
@@ -140,10 +145,10 @@ class DeepStruct:
 
     def construct(self, spec, *branches):
         """ build a recursive struct (dict/list) from a spec
-        :param spec: (str) a dotted notation specification of the struct, eg key.[n].key.[m].key,key
+        :param spec: (str) a dotted notation specification of the struct, eg key_s.[n].key_s.[m].key_s,key_s
         :param branches: a tuple of sub-structure specifications for sub branches
 
-        self.factory: a class that maps key or index to a value
+        self.factory: a class that maps key_s or index to a value
         self.list_index: (integer) if index is greater, element is filled with factory,
           otherwise it is filled with recursive call to construct
         self.list_key: (integer) if enumerate index is greater, element is filled with factory,

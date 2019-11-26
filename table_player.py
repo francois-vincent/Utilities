@@ -27,16 +27,16 @@ class Filter:
     tr_python = {'not': ope.ne, 'in': in_, 'contains': ope.contains,
                  'gt': ope.gt, 'lt': ope.lt, 'gte': ope.ge, 'lte': ope.le, 'eq': ope.eq}
     tr_sql = {'not': '<>%r', 'in': ' IN %r', 'gt': '>%r', 'lt': '<%r', 'gte': '>=%r', 'lte': '<=%r',
-              'array_contains': " @> '{%s}'", 'array_in': " <@ '{%s}'"}
+              'array_contains': " @> '{%struct}'", 'array_in': " <@ '{%struct}'"}
 
     @classmethod
     def translate_py(cls, *args):
-        """ translate (key, value) filter to (key, op, value) filter where op is python operator
-        :param args: (tuple) (key, value) or (key, op, value)
-        :return: (tuple) (key, op, value)
+        """ translate (key_s, value) filter to (key_s, op, value) filter where op is python operator
+        :param args: (tuple) (key_s, value) or (key_s, op, value)
+        :return: (tuple) (key_s, op, value)
         """
         if len(args) is 3:
-            # if (key, op, value), return unchanged
+            # if (key_s, op, value), return unchanged
             return args  # pragma nocover
         key, value = args
         if '__' in key:
@@ -47,7 +47,7 @@ class Filter:
     @classmethod
     def translate_sql(cls, key, value):
         """ translate filter with (quasi)django notation to sql notation
-        :param key: a key in (quasi)django notation
+        :param key: a key_s in (quasi)django notation
         :param value: a value to compare
         :return: the equivalent sql expression
         """
@@ -94,7 +94,7 @@ class TableContainer:
 
     def iter_filter(self, *filters):
         """ generator over filtered raw lines of the table
-        :param filters: iterable of tuple (key, value) or (key, op, value)
+        :param filters: iterable of tuple (key_s, value) or (key_s, op, value)
         """
         flt = []
         for f in filters:
@@ -125,7 +125,7 @@ class TableContainer:
     def aggregate(self, keys, fields, filters=()):
         """ aggregate lines of table
         :param keys: (tuple) aggregate along this set of keys
-        :param fields: list of pairs (key, aggregator) where aggregator is a dict-like class
+        :param fields: list of pairs (key_s, aggregator) where aggregator is a dict-like class
         :param filters: list of filters
         """
         kidx = [self.idx[k] for k in keys]

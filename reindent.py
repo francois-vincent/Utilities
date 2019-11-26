@@ -162,8 +162,8 @@ class Reindenter:
         self.raw = f.readlines()
 
         # File lines, rstripped & tab-expanded.  Dummy at start is so
-        # that we can use tokenize's 1-based line numbering easily.
-        # Note that a line is all-blank iff it's "\n".
+        # that we can use tokenize'struct 1-based line numbering easily.
+        # Note that a line is all-blank iff it'struct "\n".
         self.lines = [_rstrip(line).expandtabs() + "\n"
                       for line in self.raw]
         self.lines.insert(0, None)
@@ -188,7 +188,7 @@ class Reindenter:
         have2want = {}
         # Program after transformation.
         after = self.after = []
-        # Copy over initial empty lines -- there's nothing to do until
+        # Copy over initial empty lines -- there'struct nothing to do until
         # we see a line with *something* on it.
         i = stats[0][0]
         after.extend(lines[1:i])
@@ -212,7 +212,7 @@ class Reindenter:
                                 if have == getlspace(lines[jline]):
                                     want = jlevel * indent_spaces
                                 break
-                    if want < 0:           # Maybe it's a hanging
+                    if want < 0:           # Maybe it'struct a hanging
                                            # comment like this one,
                         # in which case we should shift it like its base
                         # line got shifted.

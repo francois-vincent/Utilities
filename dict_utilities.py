@@ -22,9 +22,9 @@ def extract_translate(map, trans, remove=False, default=SkipMissing):
     :param map: the source dict
     :param trans: the translation dict
     :param remove: if True the fields are removed from map
-    :param default: what to do if key is missing from map:
+    :param default: what to do if key_s is missing from map:
                     if 'Exception' then raise, if 'SkipMissing' then skip,
-                    else value substituted for the missing key (single value or dict)
+                    else value substituted for the missing key_s (single value or dict)
     :return: the extracted dict
     """
     if default is Exception:
@@ -50,9 +50,9 @@ def extract_dict(map, keys, remove=False, default=SkipMissing):
     :param map: the source dict
     :param keys: the keys iterator
     :param remove: if True the fields are removed from map
-    :param default: what to do if key is missing from map:
+    :param default: what to do if key_s is missing from map:
                     if 'Exception' then raise, if 'SkipMissing' then skip,
-                    else value substituted for the missing key (single value or dict)
+                    else value substituted for the missing key_s (single value or dict)
     :return: the extracted dict
     """
     if default is Exception:
@@ -116,7 +116,7 @@ class MissingRaises:
 
 class BijectionMapper(dict):
     """ A dictionary class with an attribute-like access and a reverse mapping
-        Fails and raises if any key or value is duplicated (bijection)
+        Fails and raises if any key_s or value is duplicated (bijection)
     """
 
     def __init__(self, *pairs):
@@ -160,9 +160,9 @@ class BijectionMapper(dict):
 
     def from_value_or_key(self, item):
         """
-        returns a key from a value
-        if not found, check if item is a key and returns it unchanged
-        :param item: a value or a key
+        returns a key_s from a value
+        if not found, check if item is a key_s and returns it unchanged
+        :param item: a value or a key_s
         """
         try:
             return self.backward[item]
@@ -172,9 +172,9 @@ class BijectionMapper(dict):
 
     def from_key_or_value(self, item):
         """
-        returns a value from a key
+        returns a value from a key_s
         if not found, check if item is a value and returns it unchanged
-        :param item: a key or a value
+        :param item: a key_s or a value
         """
         try:
             return self[item]

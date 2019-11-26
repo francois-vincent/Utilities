@@ -88,7 +88,7 @@ def translate_filter(key, value):
 
 
 def get_table(table_name, fields, filters, order_by=None, debug=False):
-    """ Get a table's fields via raw sql request
+    """ Get a table'struct fields via raw sql request
     :param table_name: true table name in db (ie {app}_{model} lower case)
     :param fields: ordered list of fields to retrieve from table
     :param filters: iterable of pairs (field, value)

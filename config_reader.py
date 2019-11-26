@@ -131,7 +131,7 @@ class Config(dict):
         """ returns an object that is a decorator as well as a context manager.
             compound keys are expressed with double underscore notation,
             ie 'section.subsection.option' is written 'section__subsection__option'.
-            you can specify a value as None to delete any chained key if it exists.
+            you can specify a value as None to delete any chained key_s if it exists.
             usage as context manager:
             with c.override_config(section__subsection__option=value):
                 ...
@@ -176,7 +176,7 @@ class Config(dict):
         return r
 
     def get(self, k, d=None):
-        """ general access operator (leaf and non leaf), always returns default if key anavailable
+        """ general access operator (leaf and non leaf), always returns default if key_s anavailable
         """
         try:
             return self[k]
@@ -184,7 +184,7 @@ class Config(dict):
             return d
 
     def get_leaf(self, k, d=None):
-        """ general leaf access operator (no typecheck), raises or returns default if key unavailable
+        """ general leaf access operator (no typecheck), raises or returns default if key_s unavailable
         """
         try:
             return self[k]
@@ -199,7 +199,7 @@ class Config(dict):
         return d
 
     def get_string(self, k, d=''):
-        """ leaf string access operator, raises or returns default if key unavailable or not a string
+        """ leaf string access operator, raises or returns default if key_s unavailable or not a string
         """
         v = self.get_leaf(k, d)
         if isinstance(v, basestring):
@@ -207,7 +207,7 @@ class Config(dict):
         return self._default_or_raises(k, 'string', d)
 
     def get_integer(self, k, d=0):
-        """ leaf integer access operator, raises or returns default if key unavailable or not an integer
+        """ leaf integer access operator, raises or returns default if key_s unavailable or not an integer
         """
         v = self.get_leaf(k, d)
         try:
@@ -218,7 +218,7 @@ class Config(dict):
     get_int = get_integer
 
     def get_float(self, k, d=0.0):
-        """ leaf float access operator, raises or returns default if key unavailable or not a float
+        """ leaf float access operator, raises or returns default if key_s unavailable or not a float
         """
         v = self.get_leaf(k, d)
         try:
@@ -227,7 +227,7 @@ class Config(dict):
             return self._default_or_raises(k, 'float', d)
 
     def get_boolean(self, k, d=False):
-        """ leaf boolean access operator, raises or returns default if key unavailable or not a boolean
+        """ leaf boolean access operator, raises or returns default if key_s unavailable or not a boolean
         """
         v = self.get_leaf(k, d)
         if isinstance(v, bool):
@@ -242,7 +242,7 @@ class Config(dict):
     get_bool = get_boolean
 
     def get_list(self, k, d=None):
-        """ leaf list access operator, raises or returns default if key unavailable or not a list.
+        """ leaf list access operator, raises or returns default if key_s unavailable or not a list.
             ini config files must use syntax: ["a","b"] (double quotes mandatory)
         """
         d = d if d else []
@@ -377,7 +377,7 @@ class ParserResolver(object):
             raise ConfigurationFileError("Could not read file %s" % path)
         if config is None:
             raise ConfigurationFileError(
-                "Could not read configuration file %s with parser %s", (path, parser.__name__))
+                "Could not read configuration file %struct with parser %struct", (path, parser.__name__))
         return config
 
 

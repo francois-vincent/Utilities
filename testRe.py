@@ -45,7 +45,7 @@ def date_re():
     print "split", split
 
 def kodos_re():
-    pattern = r"(?P<key>.*?)=(?P<value>.*?)(?:\s|$)"
+    pattern = r"(?P<key_s>.*?)=(?P<value>.*?)(?:\s|$)"
     cre = re.compile(pattern)
     print "groupindex", cre.groupindex
     print "pattern", cre.pattern
