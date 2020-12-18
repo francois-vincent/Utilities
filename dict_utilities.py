@@ -1,5 +1,6 @@
 
 from collections import defaultdict, Mapping
+from copy import copy
 import json
 from functools import partial
 
@@ -181,3 +182,40 @@ class BijectionMapper(dict):
         except KeyError:
             self.backward[item]
             return item
+
+
+class DictWithDefault(dict):
+    """ This is a 2 level dictionary used for settings,
+        with a default
+    """
+    default_key = 'DEFAULT'
+
+    def __getitem__(self, key):
+        # result calculated on the fly from copy because SETTINGS are often hot overridden in tests
+        val = copy(dict.__getitem__(self, key))
+        for k, v in self.get_default().items():
+            val.setdefault(k, v)
+        return val
+
+    def get(self, key, default=None):
+        raise NotImplementedError()
+
+    def get_default(self):
+        return dict.__getitem__(self, self.default_key)
+
+    def __contains__(self, key):
+        return key != self.default_key and dict.__contains__(self, key)
+
+    def keys(self):
+        return (k for k in dict.keys(self) if k != self.default_key)
+
+    def values(self):
+        return (v for k, v in dict.items(self) if k != self.default_key)
+
+    def items(self):
+        return ((k, v) for k, v in dict.items(self) if k != self.default_key)
+
+    def copy(self):
+        """ return a deepcopy
+        """
+        return self.__class__((k, copy(v)) for k, v in dict.items(self))

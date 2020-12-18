@@ -32,6 +32,11 @@ class memoize(object):
         return partial(self.__call__, obj)
 
 
+class ClassProperty(property):
+    def __get__(self, cls, owner):
+        return self.fget.__get__(None, owner)()
+
+
 if __name__ == '__main__':
     class A(object):
         def __init__(self):

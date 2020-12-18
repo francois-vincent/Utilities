@@ -2,8 +2,6 @@
 
 import itertools
 
-from cyclic_iterator import CyclicRemovable
-
 """
 Mix of various iterator tools
 """
@@ -25,7 +23,7 @@ def close_product(*sequences):
 def chunk_iter(iterable, chunk_size):
     """ group data into fixed-length chunks or blocks
         chunk_iter('ABCDEFG', 3) --> ABC DEF G
-        returns an iterator of iterators, last is always truncated
+        returns an iterator of iterators, last is truncated if shorter than chunk_size
     """
     assert chunk_size > 1
     iterator = iter(iterable)
